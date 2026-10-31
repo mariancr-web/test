@@ -1,0 +1,1481 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Corrector de Test</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/estilos.css">
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><a href="./" class="row" style="gap:10px"><span class="mark" aria-hidden="true"></span><h1>Corrector de Test</h1></a></div>
+    <div class="proj">
+      <a class="btn sm ghost" href="crear.html">Crear examen</a>
+      <button id="btn-save" class="btn sm ghost">Guardar proyecto</button>
+      <label class="btn sm ghost" for="f-proj">Abrir proyecto</label><input id="f-proj" type="file" accept=".json,application/json" hidden>
+      <button id="btn-new" class="btn sm ghost">Nuevo examen</button>
+    </div>
+  </header>
+  <nav class="steps" id="steps" aria-label="Pasos"></nav>
+
+  <main>
+  <section id="p1" class="panel">
+    <h2>Alumnos</h2>
+    <p class="lead">Sube el listado de la clase (Excel, CSV o PDF) o escribe un alumno por línea. Cada hoja saldrá impresa con su nombre y su QR.</p>
+    <div class="card">
+      <div class="row">
+        <label class="btn primary" for="f-roster">Subir listado</label><input id="f-roster" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.pdf" hidden>
+        <span class="hint">Se sustituye lo que hay escrito. Revisa el resultado antes de seguir.</span>
+      </div>
+      <textarea id="roster" rows="12" spellcheck="false" placeholder="García López, María&#10;Pérez Ruiz, Juan&#10;…"></textarea>
+      <div class="row between">
+        <span id="roster-count" class="chip">0 alumnos</span>
+        <div class="row">
+          <button id="r-sort" class="btn sm ghost">Ordenar A–Z</button>
+          <button id="r-dedupe" class="btn sm ghost">Quitar repetidos</button>
+          <button id="r-clear" class="btn sm ghost danger">Vaciar</button>
+        </div>
+      </div>
+    </div>
+    <div class="nav"><button class="btn primary" data-go="p2">Siguiente: examen</button></div>
+  </section>
+
+  <section id="p2" class="panel" hidden>
+    <h2>Examen y clave de respuestas</h2>
+    <div class="card">
+      <div class="grid">
+        <label class="f">Título del examen<input id="ex-title" type="text" placeholder="9 - Hidrosfera"></label>
+        <label class="f">Asignatura y grupo<input id="ex-group" type="text" placeholder="ByG - 1ESO B"></label>
+        <label class="f">Fecha<input id="ex-date" type="date"></label>
+        <label class="f">Número de preguntas<input id="ex-nq" type="number" min="1" max="2000" inputmode="numeric"></label>
+        <label class="f">Opciones por pregunta
+          <select id="ex-nopt"><option value="2">2 (A–B)</option><option value="3">3 (A–C)</option><option value="4">4 (A–D)</option><option value="5">5 (A–E)</option><option value="6">6 (A–F)</option></select></label>
+        <label class="f">Nota máxima<input id="ex-scale" type="number" min="1" max="100" step="any" inputmode="decimal"></label>
+        <label class="f">Fallos
+          <select id="ex-pen"><option value="none">No restan</option><option value="auto">Restan 1/(opciones−1)</option><option value="custom">Restan una fracción</option></select></label>
+        <label class="f" id="pen-custom-wrap" hidden>Fracción de punto que resta<input id="ex-penval" type="number" min="0" max="1" step="any" inputmode="decimal"></label>
+      </div>
+      <p class="hint">Las preguntas en blanco y las de doble marca no restan. Si el examen pasa de 100 preguntas, cada alumno recibe varias hojas.</p>
+    </div>
+    <div class="card">
+      <div class="row between">
+        <h3>Clave</h3>
+        <span id="key-stat" class="chip">0 de 0</span>
+      </div>
+      <div class="row">
+        <label class="row" style="gap:6px;font-weight:600;font-size:13px"><input id="multi" type="checkbox" style="width:auto;min-height:0"> Permitir varias respuestas correctas</label>
+      </div>
+      <div class="keygrid" id="keygrid"></div>
+    </div>
+    <div class="card">
+      <h3>Cargar la clave de otra forma</h3>
+      <label class="f">Pegar clave (por ejemplo <span style="font-family:var(--mono)">ABCDA…</span> o <span style="font-family:var(--mono)">1A 2C 3B…</span>)
+        <textarea id="key-paste" rows="3" placeholder="ABCDABCD…"></textarea></label>
+      <div class="row">
+        <button id="key-apply" class="btn">Aplicar clave pegada</button>
+        <label class="btn" for="f-key">Subir clave o examen (Excel, CSV, PDF)</label><input id="f-key" type="file" accept=".csv,.tsv,.txt,.xlsx,.xls,.pdf" hidden>
+        <button id="key-tpl" class="btn ghost">Descargar plantilla de clave</button>
+        <button id="key-clear" class="btn ghost danger">Borrar clave</button>
+      </div>
+      <p class="hint">Si subes el examen completo, se leen enunciados, opciones y la respuesta marcada con * o ✓ (o una línea «Respuesta: B»). Los enunciados salen luego en el informe de cada alumno. Revisa siempre la clave cargada.</p>
+    </div>
+    <div class="nav"><button class="btn ghost" data-go="p1">Atrás</button><button class="btn primary" data-go="p3">Siguiente: hojas</button></div>
+  </section>
+
+  <section id="p3" class="panel" hidden>
+    <h2>Hojas de respuestas</h2>
+    <p class="lead">Genera un PDF con una hoja por alumno. Imprímelo a tamaño real (100 %, sin «ajustar a página»), en blanco y negro vale.</p>
+    <div class="card">
+      <div class="previewwrap">
+        <canvas id="preview" class="preview" width="420" height="594" aria-label="Vista previa de la hoja"></canvas>
+        <div class="grow" style="min-width:240px;display:flex;flex-direction:column;gap:12px">
+          <p id="sheet-sum"></p>
+          <label class="f">Generar hojas para
+            <select id="sheet-who"></select></label>
+          <div class="row"><button id="sheet-gen" class="btn primary">Generar PDF de hojas</button><span id="sheet-prog" class="hint"></span></div>
+          <ul class="tips">
+            <li>Prueba primero con un solo alumno: imprime, rellena un par de círculos y escanéala.</li>
+            <li>No recortes ni dobles las esquinas: las cuatro marcas negras y el QR deben verse enteros.</li>
+            <li>Lápiz 2B/HB o bolígrafo oscuro. Los círculos hay que rellenarlos, no tachar.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="nav"><button class="btn ghost" data-go="p2">Atrás</button><button class="btn primary" data-go="p4">Siguiente: escanear</button></div>
+  </section>
+
+  <section id="p4" class="panel" hidden>
+    <h2>Escanear hojas</h2>
+    <p class="lead">Haz una foto a cada hoja con la cámara del iPad, o sube fotos y PDF escaneados (varias hojas en un mismo PDF también vale). Toda la lectura ocurre en este dispositivo.</p>
+    <div class="card">
+      <div class="row">
+        <label class="btn primary" for="f-cam">Hacer foto</label><input id="f-cam" type="file" accept="image/*" capture="environment" hidden>
+        <label class="btn" for="f-scan">Subir fotos o PDF</label><input id="f-scan" type="file" accept="image/*,.pdf,application/pdf" multiple hidden>
+        <span id="scan-prog" class="hint"></span>
+      </div>
+      <div id="drop" class="drop">O arrastra aquí las imágenes y los PDF</div>
+      <p class="hint">Para fotos: hoja entera, sobre una mesa, con luz uniforme y sin dedos sobre las esquinas.</p>
+    </div>
+    <div id="scan-sum" class="row"></div>
+    <div id="sheets" class="sheets"></div>
+    <div class="nav"><button class="btn ghost" data-go="p3">Atrás</button><button class="btn primary" data-go="p5">Siguiente: notas</button></div>
+  </section>
+
+  <section id="p5" class="panel" hidden>
+    <h2>Notas e informes</h2>
+    <div id="res-warn"></div>
+    <div id="res-stats" class="stats"></div>
+    <div class="card">
+      <div class="row">
+        <button class="btn primary" id="x-xlsx">Notas (.xlsx)</button>
+        <button class="btn" id="x-csv">Notas (.csv)</button>
+        <button class="btn" id="x-zip">Informes por alumno (.zip)</button>
+        <button class="btn" id="x-pdf">Informes en un solo PDF</button>
+        <span id="x-prog" class="hint"></span>
+      </div>
+      <div class="tscroll"><table id="restbl"></table></div>
+    </div>
+    <div class="card" id="hist-card"><h3>Reparto de notas</h3><div id="hist" class="hist"></div></div>
+    <div class="card"><details><summary>Aciertos por pregunta</summary><p class="hint" style="margin:6px 0 10px">En rojo, las preguntas con menos del 30 % de aciertos: conviene revisar la clave o el enunciado.</p><div id="qbars" class="qbars"></div></details></div>
+    <div class="nav"><button class="btn ghost" data-go="p4">Atrás</button></div>
+  </section>
+  </main>
+</div>
+
+<div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-label="Revisar hoja"><div class="mpanel" id="mpanel"></div></div>
+<div id="dlg" class="dlg" hidden role="alertdialog" aria-modal="true"><div class="box"><p id="dlg-text"></p><div class="row" style="justify-content:flex-end"><button id="dlg-no" class="btn ghost">Cancelar</button><button id="dlg-ok" class="btn primary">Aceptar</button></div></div></div>
+<div id="toast" class="toast" hidden role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+/* Núcleo del corrector: geometría de la hoja, dibujo de la hoja, lectura de fotos/escaneos. Sin DOM. */
+const OMR = (() => {
+  const PAGE_W = 210, PAGE_H = 297;
+  const FIDS = [[14, 14], [196, 14], [196, 283], [14, 283]]; // TL, TR, BR, BL (sentido horario)
+  const FID_SIZE = 8;
+  const QR_BOX = { x: 156, y: 20, s: 30 };
+  const PER_PAGE = 100, ROWS = 25, SC = 5; // SC = píxeles por mm en la hoja rectificada
+  const Y0 = 112, RP = 6.6;
+  const RW = PAGE_W * SC, RH = PAGE_H * SC;
+  const LETTERS = 'ABCDEFGH';
+
+  /* ---------- geometría ---------- */
+  function layout(nq, page, nopt) {
+    const first = page * PER_PAGE;
+    const count = Math.max(0, Math.min(PER_PAGE, nq - first));
+    const ncols = Math.max(1, Math.ceil(count / ROWS));
+    const big = ncols <= 2;
+    const d = big ? 5 : 4.4, hp = big ? 10 : 7.6, labelW = big ? 9 : 7, gap = big ? 16 : 4;
+    const blockW = labelW + (nopt - 1) * hp + d;
+    const total = ncols * blockW + (ncols - 1) * gap;
+    const x0 = (PAGE_W - total) / 2;
+    const bubbles = [], labels = [];
+    for (let i = 0; i < count; i++) {
+      const col = Math.floor(i / ROWS), row = i % ROWS;
+      const bx = x0 + col * (blockW + gap), y = Y0 + row * RP;
+      labels.push({ q: first + i, x: bx, y, labelW });
+      for (let o = 0; o < nopt; o++) bubbles.push({ q: first + i, o, x: bx + labelW + d / 2 + o * hp, y });
+    }
+    return { first, count, ncols, d, hp, labelW, blockW, x0, gap, bubbles, labels };
+  }
+  const pagesFor = nq => Math.max(1, Math.ceil(nq / PER_PAGE));
+
+  function fold(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^\x20-\x7e]/g, '')
+      .replace(/\|/g, ' ').toUpperCase().slice(0, 28);
+  }
+  function makePayload(o) { return ['EQ1', o.code, o.idx, o.page, o.pages, o.nq, o.nopt, fold(o.name)].join('|'); }
+  function parsePayload(s) {
+    if (typeof s !== 'string') return null;
+    const p = s.split('|');
+    if (p[0] !== 'EQ1' || p.length < 7) return null;
+    const r = { code: p[1], idx: +p[2], page: +p[3], pages: +p[4], nq: +p[5], nopt: +p[6], name: p.slice(7).join('|') };
+    if (![r.idx, r.page, r.pages, r.nq, r.nopt].every(Number.isFinite) || r.nq < 1 || r.nopt < 2 || r.nopt > 8) return null;
+    return r;
+  }
+
+  /* ---------- dibujo de una hoja (jsPDF) ---------- */
+  function drawSheetPage(doc, QRFactory, info) {
+    const { title, group, date, name, idx, page, pages, nq, nopt, code } = info;
+    const L = layout(nq, page, nopt);
+    doc.setFillColor(0); doc.setDrawColor(0);
+    FIDS.forEach(([x, y]) => doc.rect(x - FID_SIZE / 2, y - FID_SIZE / 2, FID_SIZE, FID_SIZE, 'F'));
+
+    const qr = QRFactory(0, 'M');
+    qr.addData(makePayload({ code, idx, page, pages, nq, nopt, name }), 'Byte');
+    qr.make();
+    const n = qr.getModuleCount(), cs = QR_BOX.s / n;
+    doc.setFillColor(0);
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++)
+      if (qr.isDark(r, c)) doc.rect(QR_BOX.x + c * cs, QR_BOX.y + r * cs, cs + 0.02, cs + 0.02, 'F');
+
+    doc.setTextColor(20);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
+    const tl = doc.splitTextToSize(String(title || 'Examen'), 124).slice(0, 2);
+    doc.text(tl, 26, 26);
+    const ty = 26 + tl.length * 6;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(110);
+    doc.text('ALUMNO/A', 26, ty + 4);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(20);
+    const nl = doc.splitTextToSize(String(name || ''), 124).slice(0, 1);
+    doc.text(nl, 26, ty + 11);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(60);
+    const meta = [group, date].filter(Boolean).join('   ·   ');
+    if (meta) doc.text(meta, 26, ty + 18);
+    if (pages > 1) {
+      doc.setFontSize(9);
+      doc.text(`Hoja ${page + 1} de ${pages}  ·  preguntas ${L.first + 1} a ${L.first + L.count}`, 26, ty + 24);
+    }
+
+    // instrucciones
+    const bx = 26, by = 64, bw = 124, bh = 40;
+    doc.setDrawColor(150); doc.setLineWidth(0.3); doc.rect(bx, by, bw, bh, 'S');
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5); doc.setTextColor(20);
+    doc.text('Cómo marcar', bx + 4, by + 6);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7.5); doc.setTextColor(50);
+    doc.text(doc.splitTextToSize('Rellena por completo el círculo de tu respuesta con lápiz (2B o HB) o bolígrafo. Si te equivocas, borra bien y marca la nueva. No uses cruces, tics ni puntos.', 64), bx + 4, by + 11);
+    const ex = bx + 80, ey = by + 12;
+    doc.setFontSize(6.5); doc.setTextColor(90);
+    doc.text('Así sí', ex, ey - 4); doc.text('Así no', ex + 18, ey - 4);
+    doc.setDrawColor(120); doc.setLineWidth(0.25);
+    doc.setFillColor(30); doc.circle(ex + 4, ey + 2, 2.2, 'FD');
+    doc.setFillColor(255);
+    [0, 1, 2].forEach(i => {
+      const cx = ex + 20 + i * 8, cy = ey + 2;
+      doc.circle(cx, cy, 2.2, 'S');
+      doc.setDrawColor(30); doc.setLineWidth(0.4);
+      if (i === 0) { doc.line(cx - 1.2, cy, cx - 0.3, cy + 1.1); doc.line(cx - 0.3, cy + 1.1, cx + 1.4, cy - 1.3); }
+      if (i === 1) { doc.line(cx - 1.3, cy - 1.3, cx + 1.3, cy + 1.3); doc.line(cx - 1.3, cy + 1.3, cx + 1.3, cy - 1.3); }
+      if (i === 2) { doc.setFillColor(30); doc.circle(cx, cy, 0.5, 'F'); doc.setFillColor(255); }
+      doc.setDrawColor(120); doc.setLineWidth(0.25);
+    });
+
+    // burbujas
+    doc.setDrawColor(115); doc.setLineWidth(0.25);
+    doc.setFont('helvetica', 'normal');
+    L.labels.forEach(l => {
+      doc.setFontSize(7.5); doc.setTextColor(20);
+      doc.text(String(l.q + 1), l.x + l.labelW - 1.6, l.y + 1, { align: 'right' });
+    });
+    doc.setFontSize(5.5); doc.setTextColor(150);
+    L.bubbles.forEach(b => {
+      doc.circle(b.x, b.y, L.d / 2, 'S');
+      doc.text(LETTERS[b.o], b.x, b.y + 0.7, { align: 'center' });
+    });
+    doc.setFontSize(6); doc.setTextColor(150);
+    doc.text(`Corrector de Test · examen ${code}`, PAGE_W / 2, 292, { align: 'center' });
+  }
+
+  /* ---------- utilidades de imagen ---------- */
+  function resizeGray(src, w, h, nw, nh) {
+    const out = new Uint8ClampedArray(nw * nh), sx = w / nw, sy = h / nh;
+    for (let y = 0; y < nh; y++) {
+      const y0 = Math.floor(y * sy), y1 = Math.max(y0 + 1, Math.min(h, Math.floor((y + 1) * sy)));
+      for (let x = 0; x < nw; x++) {
+        const x0 = Math.floor(x * sx), x1 = Math.max(x0 + 1, Math.min(w, Math.floor((x + 1) * sx)));
+        let s = 0;
+        for (let yy = y0; yy < y1; yy++) { const o = yy * w; for (let xx = x0; xx < x1; xx++) s += src[o + xx]; }
+        out[y * nw + x] = s / ((y1 - y0) * (x1 - x0));
+      }
+    }
+    return out;
+  }
+
+  function homography(s, d) {
+    const A = [];
+    for (let i = 0; i < 4; i++) {
+      const [x, y] = s[i], [u, v] = d[i];
+      A.push([x, y, 1, 0, 0, 0, -u * x, -u * y, u]);
+      A.push([0, 0, 0, x, y, 1, -v * x, -v * y, v]);
+    }
+    for (let c = 0; c < 8; c++) {
+      let p = c;
+      for (let r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+      [A[c], A[p]] = [A[p], A[c]];
+      if (Math.abs(A[c][c]) < 1e-12) return null;
+      for (let r = 0; r < 8; r++) {
+        if (r === c) continue;
+        const f = A[r][c] / A[c][c];
+        for (let k = c; k < 9; k++) A[r][k] -= f * A[c][k];
+      }
+    }
+    const H = []; for (let i = 0; i < 8; i++) H.push(A[i][8] / A[i][i]);
+    H.push(1); return H;
+  }
+  const applyH = (H, x, y) => { const w = H[6] * x + H[7] * y + H[8]; return [(H[0] * x + H[1] * y + H[2]) / w, (H[3] * x + H[4] * y + H[5]) / w]; };
+
+  function bilinear(g, w, h, x, y) {
+    if (x < 0 || y < 0 || x > w - 1 || y > h - 1) return 255;
+    const x0 = x | 0, y0 = y | 0, x1 = Math.min(w - 1, x0 + 1), y1 = Math.min(h - 1, y0 + 1);
+    const fx = x - x0, fy = y - y0;
+    const a = g[y0 * w + x0], b = g[y0 * w + x1], c = g[y1 * w + x0], d = g[y1 * w + x1];
+    return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+  }
+
+  function rectify(g, w, h, H) {
+    const out = new Uint8ClampedArray(RW * RH);
+    for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) {
+      const [u, v] = applyH(H, (x + 0.5) / SC, (y + 0.5) / SC);
+      out[y * RW + x] = bilinear(g, w, h, u - 0.5, v - 0.5);
+    }
+    return out;
+  }
+
+  /* ---------- esquinas ---------- */
+  function findSquares(g, w, h) {
+    const W1 = w + 1, I = new Float64Array(W1 * (h + 1));
+    for (let y = 0; y < h; y++) {
+      let row = 0;
+      for (let x = 0; x < w; x++) { row += g[y * w + x]; I[(y + 1) * W1 + x + 1] = I[y * W1 + x + 1] + row; }
+    }
+    const half = Math.max(8, Math.round(Math.min(w, h) / 10));
+    const bin = new Uint8Array(w * h);
+    for (let y = 0; y < h; y++) {
+      const y0 = Math.max(0, y - half), y1 = Math.min(h, y + half + 1);
+      for (let x = 0; x < w; x++) {
+        const x0 = Math.max(0, x - half), x1 = Math.min(w, x + half + 1);
+        const m = (I[y1 * W1 + x1] - I[y0 * W1 + x1] - I[y1 * W1 + x0] + I[y0 * W1 + x0]) / ((y1 - y0) * (x1 - x0));
+        if (g[y * w + x] < m * 0.66) bin[y * w + x] = 1;
+      }
+    }
+    const lab = new Uint8Array(w * h), stack = new Int32Array(w * h), out = [];
+    for (let s = 0; s < w * h; s++) {
+      if (!bin[s] || lab[s]) continue;
+      let sp = 0; stack[sp++] = s; lab[s] = 1;
+      let n = 0, sx = 0, sy = 0, sxx = 0, syy = 0, sxy = 0, minx = w, maxx = 0, miny = h, maxy = 0;
+      while (sp) {
+        const p = stack[--sp], px = p % w, py = (p / w) | 0;
+        n++; sx += px; sy += py; sxx += px * px; syy += py * py; sxy += px * py;
+        if (px < minx) minx = px; if (px > maxx) maxx = px; if (py < miny) miny = py; if (py > maxy) maxy = py;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          if (!dx && !dy) continue;
+          const qx = px + dx, qy = py + dy;
+          if (qx < 0 || qy < 0 || qx >= w || qy >= h) continue;
+          const q = qy * w + qx;
+          if (bin[q] && !lab[q]) { lab[q] = 1; stack[sp++] = q; }
+        }
+      }
+      if (n < w * h * 0.00005 || n > w * h * 0.03) continue;
+      const bw = maxx - minx + 1, bh = maxy - miny + 1;
+      if (n / (bw * bh) < 0.4) continue;
+      const mx = sx / n, my = sy / n;
+      const cxx = sxx / n - mx * mx + 1 / 12, cyy = syy / n - my * my + 1 / 12, cxy = sxy / n - mx * my;
+      const tr = cxx + cyy, det = cxx * cyy - cxy * cxy, disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+      const l1 = tr / 2 + disc, l2 = tr / 2 - disc;
+      if (l2 <= 0) continue;
+      if (Math.sqrt(l2 / l1) < 0.72) continue;
+      const solid = 12 * Math.sqrt(l1 * l2) / n;
+      if (solid < 0.8 || solid > 1.25) continue;
+      out.push({ x: mx + 0.5, y: my + 0.5, area: n });
+    }
+    return out.sort((a, b) => b.area - a.area).slice(0, 14);
+  }
+
+  function pickQuad(c) {
+    let best = null, bs = 0;
+    const n = c.length, TARGET = 182 / 269;
+    for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) for (let d = b + 1; d < n; d++) for (let e = d + 1; e < n; e++) {
+      const P = [c[a], c[b], c[d], c[e]];
+      const amax = Math.max(...P.map(p => p.area)), amin = Math.min(...P.map(p => p.area));
+      if (amax / amin > 2.6) continue;
+      const cx = P.reduce((s, p) => s + p.x, 0) / 4, cy = P.reduce((s, p) => s + p.y, 0) / 4;
+      P.sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx));
+      const dist = (p, q) => Math.hypot(p.x - q.x, p.y - q.y);
+      const s = [dist(P[0], P[1]), dist(P[1], P[2]), dist(P[2], P[3]), dist(P[3], P[0])];
+      if (Math.min(s[0], s[2]) / Math.max(s[0], s[2]) < 0.6 || Math.min(s[1], s[3]) / Math.max(s[1], s[3]) < 0.6) continue;
+      let sign = 0, ok = true;
+      for (let i = 0; i < 4; i++) {
+        const p = P[i], q = P[(i + 1) % 4], r = P[(i + 2) % 4];
+        const cr = (q.x - p.x) * (r.y - q.y) - (q.y - p.y) * (r.x - q.x);
+        if (!sign) sign = Math.sign(cr); else if (Math.sign(cr) !== sign) ok = false;
+      }
+      if (!ok) continue;
+      const m1 = (s[0] + s[2]) / 2, m2 = (s[1] + s[3]) / 2;
+      const r = Math.min(m1, m2) / Math.max(m1, m2);
+      const dev = Math.abs(Math.log(r / TARGET));
+      if (dev > 0.4) continue;
+      let area = 0;
+      for (let i = 0; i < 4; i++) { const p = P[i], q = P[(i + 1) % 4]; area += p.x * q.y - q.x * p.y; }
+      const score = Math.abs(area / 2) * (1 - dev) * (amin / amax);
+      if (score > bs) { bs = score; best = P.map(p => [p.x, p.y]); }
+    }
+    return best;
+  }
+
+  // Si solo se ven tres esquinas, estima la cuarta por paralelogramo (el refinado la localiza después).
+  function pickTriple(c) {
+    let best = null, bs = 0; const TARGET = 182 / 269, n = c.length;
+    for (let i = 0; i < n; i++) for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) {
+      if (i === a || i === b) continue;
+      const P = c[i], A = c[a], B = c[b]; // P = esquina del ángulo recto
+      const va = [A.x - P.x, A.y - P.y], vb = [B.x - P.x, B.y - P.y];
+      const la = Math.hypot(...va), lb = Math.hypot(...vb);
+      if (!la || !lb) continue;
+      const cos = (va[0] * vb[0] + va[1] * vb[1]) / (la * lb);
+      if (Math.abs(cos) > 0.35) continue;
+      const r = Math.min(la, lb) / Math.max(la, lb), dev = Math.abs(Math.log(r / TARGET));
+      if (dev > 0.35) continue;
+      const amax = Math.max(P.area, A.area, B.area), amin = Math.min(P.area, A.area, B.area);
+      if (amax / amin > 2.6) continue;
+      const score = la * lb * (1 - dev) * (amin / amax);
+      if (score > bs) { bs = score; best = [P, A, B]; }
+    }
+    if (!best) return null;
+    const [P, A, B] = best, D = { x: A.x + B.x - P.x, y: A.y + B.y - P.y };
+    const Q = [P, A, D, B], cx = Q.reduce((s, p) => s + p.x, 0) / 4, cy = Q.reduce((s, p) => s + p.y, 0) / 4;
+    Q.sort((p, q) => Math.atan2(p.y - cy, p.x - cx) - Math.atan2(q.y - cy, q.x - cx));
+    return Q.map(p => [p.x, p.y]);
+  }
+
+  /* ---------- QR ---------- */
+  function decodeQR(g, w, h, H) {
+    const PX = 12, x0 = QR_BOX.x - 5, y0 = QR_BOX.y - 5, S = (QR_BOX.s + 10) * PX;
+    const rgba = new Uint8ClampedArray(S * S * 4);
+    for (let y = 0; y < S; y++) for (let x = 0; x < S; x++) {
+      const [u, v] = applyH(H, x0 + (x + 0.5) / PX, y0 + (y + 0.5) / PX);
+      const val = bilinear(g, w, h, u - 0.5, v - 0.5), o = (y * S + x) * 4;
+      rgba[o] = rgba[o + 1] = rgba[o + 2] = val; rgba[o + 3] = 255;
+    }
+    const r = jsQR(rgba, S, S, { inversionAttempts: 'dontInvert' });
+    return r && r.data ? r.data : null;
+  }
+
+  function regionStd(g, w, h, H) {
+    let s = 0, s2 = 0, n = 0;
+    for (let yy = 0; yy < 40; yy++) for (let xx = 0; xx < 40; xx++) {
+      const [u, v] = applyH(H, QR_BOX.x + xx * QR_BOX.s / 40, QR_BOX.y + yy * QR_BOX.s / 40);
+      const val = bilinear(g, w, h, u, v); s += val; s2 += val * val; n++;
+    }
+    return s2 / n - (s / n) * (s / n);
+  }
+
+  /* ---------- refinado de esquinas en la hoja rectificada ---------- */
+  // Busca el cuadrado negro de 8 mm cerca de (fx,fy) mm: máximo contraste (dentro oscuro, anillo claro).
+  function locateFid(rect, fx, fy, Rmm) {
+    const half = Math.round(FID_SIZE * SC / 2), R = Math.round(Rmm * SC), pad = half * 2;
+    const cx = Math.round(fx * SC), cy = Math.round(fy * SC);
+    const x0 = Math.max(0, cx - R - pad), y0 = Math.max(0, cy - R - pad);
+    const x1 = Math.min(RW - 1, cx + R + pad), y1 = Math.min(RH - 1, cy + R + pad);
+    const ww = x1 - x0 + 1, wh = y1 - y0 + 1;
+    const hist = new Uint32Array(256);
+    for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) hist[rect[y * RW + x] | 0]++;
+    const n = ww * wh, pct = q => { let a = 0; for (let v = 0; v < 256; v++) { a += hist[v]; if (a >= n * q) return v; } return 255; };
+    const lo = pct(0.03), hi = pct(0.9);
+    if (hi - lo < 50) return null;
+    const t = (lo + hi) / 2, W1 = ww + 1, I = new Int32Array(W1 * (wh + 1));
+    for (let y = 0; y < wh; y++) { let row = 0; for (let x = 0; x < ww; x++) { row += rect[(y + y0) * RW + x + x0] < t ? 1 : 0; I[(y + 1) * W1 + x + 1] = I[y * W1 + x + 1] + row; } }
+    const box = (ax, ay, bx, by) => { ax = Math.max(0, ax); ay = Math.max(0, ay); bx = Math.min(ww, bx); by = Math.min(wh, by); return I[by * W1 + bx] - I[ay * W1 + bx] - I[by * W1 + ax] + I[ay * W1 + ax]; };
+    let best = null, bs = -9;
+    const inA = 4 * half * half, ringA = 16 * half * half - inA;
+    for (let dy = -R; dy <= R; dy++) for (let dx = -R; dx <= R; dx++) {
+      const ax = cx + dx - half - x0, ay = cy + dy - half - y0;
+      if (ax < 0 || ay < 0 || ax + 2 * half > ww || ay + 2 * half > wh) continue;
+      const inside = box(ax, ay, ax + 2 * half, ay + 2 * half) / inA;
+      if (inside < 0.8) continue;
+      const ring = (box(ax - half, ay - half, ax + 3 * half, ay + 3 * half) - inside * inA) / ringA;
+      const sc = inside - 2 * ring;
+      if (sc > bs) { bs = sc; best = { dx, dy, inside, ring }; }
+    }
+    if (!best || best.ring > 0.12) return null;
+    // centroide fino
+    const bx = cx + best.dx, by = cy + best.dy, m = half + 3;
+    let sw = 0, sx = 0, sy = 0;
+    for (let y = by - m; y < by + m; y++) for (let x = bx - m; x < bx + m; x++) {
+      if (x < 0 || y < 0 || x >= RW || y >= RH) continue;
+      const v = rect[y * RW + x]; if (v < t) { const w = t - v; sw += w; sx += w * (x + 0.5); sy += w * (y + 0.5); }
+    }
+    if (!sw) return null;
+    return { x: sx / sw, y: sy / sw };
+  }
+
+  function refineCorners(rect, H, pts4, Rmm) {
+    const out = pts4.map(p => p.slice()), ok = [false, false, false, false]; let maxShift = 0;
+    FIDS.forEach(([fx, fy], i) => {
+      const f = locateFid(rect, fx, fy, Rmm);
+      if (!f) return;
+      ok[i] = true;
+      maxShift = Math.max(maxShift, Math.hypot(f.x - fx * SC, f.y - fy * SC) / SC);
+      out[i] = applyH(H, f.x / SC, f.y / SC);
+    });
+    return { pts: out, ok, okCount: ok.filter(Boolean).length, maxShift };
+  }
+
+  /* ---------- aplanar iluminación ---------- */
+  function flatten(g) {
+    const cell = 32, gw = Math.ceil(RW / cell), gh = Math.ceil(RH / cell);
+    const bg = new Float32Array(gw * gh), hist = new Uint32Array(256);
+    for (let cy = 0; cy < gh; cy++) for (let cx = 0; cx < gw; cx++) {
+      hist.fill(0); let n = 0;
+      for (let y = cy * cell; y < Math.min(RH, (cy + 1) * cell); y++)
+        for (let x = cx * cell; x < Math.min(RW, (cx + 1) * cell); x++) { hist[g[y * RW + x] | 0]++; n++; }
+      let a = 0, v = 0; for (; v < 256; v++) { a += hist[v]; if (a >= n * 0.85) break; }
+      bg[cy * gw + cx] = v;
+    }
+    const sorted = Array.from(bg).sort((a, b) => a - b), med = sorted[sorted.length >> 1];
+    for (let i = 0; i < bg.length; i++) bg[i] = Math.max(bg[i], med * 0.6);
+    const sm = new Float32Array(bg.length);
+    for (let cy = 0; cy < gh; cy++) for (let cx = 0; cx < gw; cx++) {
+      let s = 0, n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        const x = cx + dx, y = cy + dy; if (x < 0 || y < 0 || x >= gw || y >= gh) continue;
+        s += bg[y * gw + x]; n++;
+      }
+      sm[cy * gw + cx] = s / n;
+    }
+    const out = new Uint8ClampedArray(RW * RH);
+    for (let y = 0; y < RH; y++) {
+      const fy = Math.min(gh - 1, Math.max(0, (y + 0.5) / cell - 0.5)), y0 = Math.floor(fy), y1 = Math.min(gh - 1, y0 + 1), ty = fy - y0;
+      for (let x = 0; x < RW; x++) {
+        const fx = Math.min(gw - 1, Math.max(0, (x + 0.5) / cell - 0.5)), x0 = Math.floor(fx), x1 = Math.min(gw - 1, x0 + 1), tx = fx - x0;
+        const b = (sm[y0 * gw + x0] * (1 - tx) + sm[y0 * gw + x1] * tx) * (1 - ty) + (sm[y1 * gw + x0] * (1 - tx) + sm[y1 * gw + x1] * tx) * ty;
+        out[y * RW + x] = Math.min(255, g[y * RW + x] / Math.max(b, 30) * 245);
+      }
+    }
+    return out;
+  }
+
+  /* ---------- lectura de burbujas ---------- */
+  const T_MARK = 0.2, T_DOUBT = 0.1;
+  function readBubbles(n, nq, page, nopt) {
+    const L = layout(nq, page, nopt), r = L.d * 0.36 * SC;
+    const raw = L.bubbles.map(b => {
+      const cx = b.x * SC, cy = b.y * SC;
+      let s = 0, c = 0;
+      for (let y = Math.floor(cy - r); y <= Math.ceil(cy + r); y++) for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) {
+        if ((x + 0.5 - cx) ** 2 + (y + 0.5 - cy) ** 2 > r * r) continue;
+        s += n[y * RW + x]; c++;
+      }
+      return (245 - s / c) / 205;
+    });
+    const med = raw.slice().sort((a, b) => a - b)[raw.length >> 1];
+    const byQ = new Map();
+    L.bubbles.forEach((b, i) => { if (!byQ.has(b.q)) byQ.set(b.q, []); byQ.get(b.q)[b.o] = raw[i] - med; });
+    const answers = [];
+    for (let q = L.first; q < L.first + L.count; q++) {
+      const s = byQ.get(q), mx = Math.max(...s);
+      const sorted = s.slice().sort((a, b) => b - a);
+      let pick = '', state = 'ok';
+      if (mx < T_DOUBT) state = 'blank';
+      else if (mx < T_MARK) { pick = LETTERS[s.indexOf(mx)]; state = 'doubt'; }
+      else {
+        const idxs = s.map((v, i) => [v, i]).filter(([v]) => v >= Math.max(T_MARK, 0.55 * mx)).map(([, i]) => i);
+        if (idxs.length === 1) { pick = LETTERS[idxs[0]]; if (sorted[1] >= Math.max(0.18, 0.4 * mx)) state = 'check'; }
+        else { pick = idxs.map(i => LETTERS[i]).join(''); state = 'multi'; }
+      }
+      answers.push({ q, pick, state, s: s.map(v => Math.round(v * 1000) / 1000) });
+    }
+    return answers;
+  }
+
+  // Orientación sin QR: en la orientación correcta cada burbuja tiene su aro oscuro alrededor de un centro claro.
+  function ringScore(rect, nq, nopt, page) {
+    const L = layout(nq, page, nopt), r0 = L.d / 2 * SC; let tot = 0, cnt = 0;
+    const at = (x, y) => rect[Math.round(y) * RW + Math.round(x)];
+    for (let i = 0; i < L.bubbles.length; i += Math.max(1, Math.floor(L.bubbles.length / 150))) {
+      const b = L.bubbles[i], cx = b.x * SC, cy = b.y * SC; let ring = 0, cen = 0;
+      for (let a = 0; a < 16; a++) { const t = a * Math.PI / 8; ring += at(cx + Math.cos(t) * r0, cy + Math.sin(t) * r0); }
+      for (let a = 0; a < 8; a++) { const t = a * Math.PI / 4; cen += at(cx + Math.cos(t) * r0 * 0.45, cy + Math.sin(t) * r0 * 0.45); }
+      tot += cen / 8 - ring / 16; cnt++;
+    }
+    return tot / cnt;
+  }
+
+  /* ---------- proceso completo de una imagen ---------- */
+  function decodeWhole(gray, w, h) {
+    const rgba = new Uint8ClampedArray(w * h * 4);
+    for (let i = 0; i < w * h; i++) { const v = gray[i]; rgba[i * 4] = rgba[i * 4 + 1] = rgba[i * 4 + 2] = v; rgba[i * 4 + 3] = 255; }
+    const r = jsQR(rgba, w, h, { inversionAttempts: 'dontInvert' });
+    return r && r.data ? { data: r.data, loc: r.location } : null;
+  }
+
+  // gray: Uint8ClampedArray w*h. Devuelve {ok, error?, payload, rect, answers, warn}
+  function scan(gray, w, h, hint) {
+    const ds = Math.max(1, Math.max(w, h) / 1100);
+    const sw = Math.round(w / ds), sh = Math.round(h / ds);
+    const small = ds === 1 ? gray : resizeGray(gray, w, h, sw, sh);
+    const cands = findSquares(small, sw, sh);
+    const quad = (cands.length >= 4 && pickQuad(cands)) || (cands.length >= 3 && pickTriple(cands)) || null;
+    if (!quad) return { ok: false, error: 'No se ven las cuatro esquinas negras de la hoja. Haz la foto con la hoja entera, plana y bien iluminada.' };
+    const fsx = w / sw, fsy = h / sh;
+    const pts = quad.map(([x, y]) => [x * fsx, y * fsy]);
+    const orient = (P, k) => [0, 1, 2, 3].map(i => P[(i + k) % 4]);
+
+    // 1) orientación: probar el QR en su sitio con cada giro posible
+    const useQR = !(hint && hint.skipQR);
+    let payloadStr = null, kBest = -1;
+    for (let k = 0; k < 4 && kBest < 0 && useQR; k++) {
+      const Hk = homography(FIDS, orient(pts, k));
+      if (!Hk) continue;
+      const r = decodeQR(gray, w, h, Hk);
+      if (r && parsePayload(r)) { payloadStr = r; kBest = k; }
+    }
+    // 2) si falla, buscar el QR en toda la imagen: la esquina más cercana a él es la superior derecha
+    if (kBest < 0 && useQR) {
+      const wd = decodeWhole(gray, w, h);
+      if (wd && parsePayload(wd.data) && wd.loc) {
+        const L = wd.loc, qx = (L.topLeftCorner.x + L.bottomRightCorner.x) / 2, qy = (L.topLeftCorner.y + L.bottomRightCorner.y) / 2;
+        let j = 0, bd = 1e18;
+        pts.forEach((p, i) => { const d = Math.hypot(p[0] - qx, p[1] - qy); if (d < bd) { bd = d; j = i; } });
+        kBest = (j - 1 + 4) % 4; payloadStr = wd.data;
+      }
+    }
+    // 3) sin QR: orientación por el patrón de aros de las burbujas (usa las dimensiones del examen actual)
+    if (kBest < 0) {
+      if (!(hint && hint.nq && hint.nopt)) return { ok: false, error: 'No se pudo leer el QR de la hoja.' };
+      let bs = -1e9;
+      for (let k = 0; k < 4; k++) {
+        const Hk = homography(FIDS, orient(pts, k)); if (!Hk) continue;
+        const sc = ringScore(rectify(gray, w, h, Hk), hint.nq, hint.nopt, hint.page || 0);
+        if (sc > bs) { bs = sc; kBest = k; }
+      }
+      if (kBest < 0) kBest = 0;
+    }
+    let cur = orient(pts, kBest), H = homography(FIDS, cur);
+    if (!H) return { ok: false, error: 'No se pudo calcular la perspectiva de la hoja.' };
+    let rect = rectify(gray, w, h, H);
+    let ref = refineCorners(rect, H, cur, 12);
+    if (ref.okCount < 3) return { ok: false, error: 'No se localizan con claridad las esquinas de la hoja (¿hay una tapada o muy sombreada?).' };
+    cur = ref.pts; H = homography(FIDS, cur);
+    if (H) { rect = rectify(gray, w, h, H); ref = refineCorners(rect, H, cur, 3); if (ref.okCount >= 3) { cur = ref.pts; H = homography(FIDS, cur) || H; rect = rectify(gray, w, h, H); } }
+    const maxShift = ref.maxShift, missing = 4 - ref.okCount;
+    if (!payloadStr && useQR) { const r = decodeQR(gray, w, h, H); if (r && parsePayload(r)) payloadStr = r; }
+    const payload = payloadStr ? parsePayload(payloadStr) : null;
+    const flat = flatten(rect);
+    const nq = payload ? payload.nq : (hint && hint.nq), nopt = payload ? payload.nopt : (hint && hint.nopt);
+    const page = payload ? payload.page : ((hint && hint.page) || 0);
+    if (!nq || !nopt) return { ok: false, error: 'No se pudo leer el QR de la hoja.', rect: flat, payload: null };
+    const answers = readBubbles(flat, nq, page, nopt);
+    const flagged = answers.filter(a => a.state !== 'ok' && a.state !== 'blank').length;
+    const warn = [];
+    if (useQR && payloadStr) { const v = decodeQR(gray, w, h, H); if (v !== payloadStr) warn.push('La hoja puede estar mal alineada (el QR no coincide donde debería); revisa las marcas.'); }
+    if (missing || maxShift > 2.5) warn.push('La hoja parece deformada o con alguna esquina tapada; revisa las marcas.');
+    if (flagged > answers.length * 0.35) warn.push('Muchas respuestas dudosas: la foto puede estar movida o mal alineada.');
+    return { ok: true, payload, payloadStr, rect: flat, answers, warn, maxShift };
+  }
+
+  return { PAGE_W, PAGE_H, FIDS, QR_BOX, PER_PAGE, ROWS, SC, RW, RH, LETTERS, layout, pagesFor, fold, makePayload, parsePayload, drawSheetPage, scan, read: readBubbles, T_MARK, T_DOUBT };
+})();
+if (typeof module !== 'undefined') module.exports = OMR;
+
+</script>
+<script>
+/* Lógica pura de la app: lectura de listados y claves, notas e informes. Sin DOM. */
+const LG = (() => {
+  const LET = 'ABCDEFGH';
+
+  function parseDelimited(text) {
+    const t = String(text).replace(/^﻿/, '');
+    const first = t.split(/\r?\n/).find(l => l.trim()) || '';
+    const cnt = ch => (first.match(new RegExp(ch === '\t' ? '\\t' : '\\' + ch, 'g')) || []).length;
+    const delim = [';', '\t', ','].map(d => [d, cnt(d)]).sort((a, b) => b[1] - a[1])[0];
+    const D = delim[1] ? delim[0] : ',';
+    const rows = []; let row = [], cur = '', q = false;
+    for (let i = 0; i < t.length; i++) {
+      const c = t[i];
+      if (q) { if (c === '"') { if (t[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += c; }
+      else if (c === '"') q = true;
+      else if (c === D) { row.push(cur); cur = ''; }
+      else if (c === '\n') { row.push(cur); rows.push(row); row = []; cur = ''; }
+      else if (c !== '\r') cur += c;
+    }
+    if (cur || row.length) { row.push(cur); rows.push(row); }
+    return rows;
+  }
+
+  function namesFromRows(rowsIn) {
+    const rows = rowsIn.map(r => r.map(c => String(c == null ? '' : c).trim())).filter(r => r.some(c => c));
+    if (!rows.length) return [];
+    const hdrIdx = rows.slice(0, 6).findIndex(r => r.some(c => /^(apellidos?|nombre|alumn[oa]s?|estudiante)/i.test(c)));
+    let ap = -1, no = -1, full = -1, start = 0;
+    if (hdrIdx >= 0) {
+      const hdr = rows[hdrIdx];
+      ap = hdr.findIndex(c => /apellid/i.test(c) && !/nombre/i.test(c));
+      no = hdr.findIndex(c => /^nombre$/i.test(c) || /^nombre\s*\(/i.test(c));
+      full = hdr.findIndex(c => /^(alumn[oa]s?|estudiante|nombre y apellidos|apellidos y nombre|apellidos, nombre)/i.test(c) || (/apellid/i.test(c) && /nombre/i.test(c)));
+      start = hdrIdx + 1;
+    }
+    const out = [];
+    for (const r of rows.slice(start)) {
+      let n = '';
+      if (ap >= 0 && no >= 0 && (r[ap] || r[no])) n = [r[ap], r[no]].filter(Boolean).join(', ');
+      else if (full >= 0) n = r[full];
+      else if (no >= 0) n = r[no];
+      else if (ap >= 0) n = r[ap];
+      else n = r.find(c => /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{2,}/.test(c) && !/^[\d.,\s]+$/.test(c)) || '';
+      n = (n || '').replace(/^\s*\d+\s*[.)\-–]\s*/, '').trim();
+      if (n) out.push(n);
+    }
+    return out;
+  }
+
+  function namesFromPdfLines(lines) {
+    const skip = /^(lista|curso|grupo|clase|p[aá]gina|n[º°o]\.?$|alumn[oa]s?$|fecha|asignatura|tutor|profesor|colegio|total)/i;
+    const out = [];
+    for (let l of lines) {
+      l = l.replace(/^\s*\d+\s*[.)\-–]?\s+/, '').replace(/(\s+[\d.,]+)+\s*$/, '').trim();
+      if (!/[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{2,}/.test(l) || skip.test(l) || l.length > 60) continue;
+      out.push(l);
+    }
+    return out;
+  }
+
+  // "ABCDA", "1A 2B 3C", "1-A, 2-B", una por línea… Devuelve array de longitud nq con letras ('' si falta)
+  function parseKeyText(txt, nq) {
+    const t = String(txt || '').trim(), res = new Array(nq).fill('');
+    const pairs = [...t.matchAll(/(\d{1,4})\s*[-.):=\t ]?\s*([A-Ha-h](?:\s*[,/]\s*[A-Ha-h])*)(?![A-Za-z])/g)];
+    if (pairs.length >= Math.min(3, nq) && pairs.length >= nq * 0.5) {
+      pairs.forEach(m => { const q = +m[1] - 1; if (q >= 0 && q < nq) res[q] = [...new Set(m[2].toUpperCase().replace(/[^A-H]/g, '').split(''))].sort().join(''); });
+      return res;
+    }
+    const letters = t.toUpperCase().replace(/[^A-H]/g, '');
+    for (let i = 0; i < Math.min(nq, letters.length); i++) res[i] = letters[i];
+    return res;
+  }
+
+  // Hoja de cálculo con clave. Devuelve [{q,a,p,x,t,o}] (solo lo que encuentre)
+  function keyFromRows(rowsIn) {
+    const rows = rowsIn.map(r => r.map(c => String(c == null ? '' : c).trim())).filter(r => r.some(c => c));
+    if (!rows.length) return [];
+    let hi = rows.slice(0, 5).findIndex(r => r.some(c => /(respuesta|correcta|clave|soluci)/i.test(c)));
+    let cN = 0, cA = 1, cP = -1, cX = -1, cT = -1; const cO = {};
+    let start = 0;
+    if (hi >= 0) {
+      const h = rows[hi]; start = hi + 1;
+      cN = h.findIndex(c => /^(n[º°o]?\.?|n[uú]m(ero)?|pregunta|#)$/i.test(c)); if (cN < 0) cN = 0;
+      cA = h.findIndex(c => /(respuesta|correcta|clave|soluci)/i.test(c));
+      cP = h.findIndex(c => /punt/i.test(c));
+      cX = h.findIndex(c => /anul/i.test(c));
+      cT = h.findIndex(c => /(enunciado|texto|pregunta)/i.test(c) && !/^(n[º°o]?\.?|n[uú]m(ero)?)$/i.test(c));
+      h.forEach((c, i) => { const m = c.match(/^(?:opci[oó]n\s*)?([A-H])$/i); if (m) cO[m[1].toUpperCase()] = i; });
+    }
+    const out = [];
+    rows.slice(start).forEach((r, i) => {
+      const num = parseInt(String(r[cN]).replace(/\D/g, ''), 10);
+      const q = Number.isFinite(num) ? num - 1 : i;
+      const a = String(r[cA] || '').toUpperCase().replace(/[^A-H]/g, '');
+      const o = {}; Object.keys(cO).forEach(L => { if (r[cO[L]]) o[L] = r[cO[L]]; });
+      const p = cP >= 0 ? parseFloat(String(r[cP]).replace(',', '.')) : NaN;
+      out.push({ q, a: [...new Set(a.split(''))].sort().join(''), p: Number.isFinite(p) && p > 0 ? p : 1, x: cX >= 0 && /^(s[ií]|x|1|true|anulada)/i.test(r[cX] || ''), t: cT >= 0 ? r[cT] : '', o });
+    });
+    return out.filter(k => k.q >= 0);
+  }
+
+  // Examen en texto: "1. Enunciado", "A) opción", marca de correcta con * o ✓ o "Respuesta: B"
+  function parseExamText(text) {
+    const lines = String(text).split(/\r?\n/).map(l => l.replace(/\s+/g, ' ').trim()).filter(Boolean);
+    const qs = []; let cur = null, lastOpt = null;
+    const reQ = /^(\d{1,4})\s*[.)\-–]\s*(.+)$/, reO = /^\(?([A-Ha-h])\s*[.)\]]\s*(.+)$/, reAns = /^(?:respuesta(?:\s+correcta)?|soluci[oó]n|clave)\s*[:=\-]?\s*\(?([A-Ha-h])\)?\b/i;
+    const mark = s => { let m = false; s = s.replace(/^\s*[*✓✔]\s*|\s*[*✓✔]\s*$/g, () => { m = true; return ''; }).replace(/\s*\((?:correcta|x|ok)\)\s*$/i, () => { m = true; return ''; }).replace(/^\[x\]\s*/i, () => { m = true; return ''; }); return [s.trim(), m]; };
+    for (const l of lines) {
+      let m;
+      if ((m = l.match(reAns)) && cur) { cur.a = m[1].toUpperCase(); lastOpt = null; continue; }
+      if ((m = l.match(reO)) && cur && (m[1] === m[1].toUpperCase() || cur.o.A !== undefined || m[1] === 'a')) {
+        const L = m[1].toUpperCase(); const [txt, ok] = mark(m[2]);
+        cur.o[L] = txt; if (ok) cur.a = (cur.a && cur.a.length ? cur.a : '') + L; lastOpt = L; continue;
+      }
+      if ((m = l.match(reQ)) && (!cur || +m[1] === cur.q + 2 || +m[1] === cur.q + 1 || !qs.length)) {
+        cur = { q: +m[1] - 1, t: m[2], o: {}, a: '' }; qs.push(cur); lastOpt = null; continue;
+      }
+      if (cur) { if (lastOpt) cur.o[lastOpt] += ' ' + l; else cur.t += ' ' + l; }
+    }
+    qs.forEach(q => { q.a = [...new Set((q.a || '').split(''))].sort().join(''); });
+    return qs.filter(q => Object.keys(q.o).length >= 2 || q.a);
+  }
+
+  /* ---------- notas ---------- */
+  function grade(key, ans, o) {
+    const pen = o.penMode === 'auto' ? 1 / Math.max(1, o.nopt - 1) : o.penMode === 'custom' ? (+o.penVal || 0) : 0;
+    let c = 0, w = 0, b = 0, pts = 0, max = 0, nokey = 0;
+    const det = [];
+    for (let q = 0; q < o.nq; q++) {
+      const k = key[q] || {};
+      if (k.x) { det[q] = 'void'; continue; }
+      if (!k.a) { det[q] = 'nokey'; nokey++; continue; }
+      const p = +k.p > 0 ? +k.p : 1; max += p;
+      const a = ans[q] || '';
+      if (!a || a.length > 1) { b++; det[q] = 'blank'; }
+      else if (k.a.includes(a)) { c++; pts += p; det[q] = 'ok'; }
+      else { w++; pts -= p * pen; det[q] = 'bad'; }
+    }
+    const nota = max ? Math.min(o.scale, Math.max(0, pts / max * o.scale)) : 0;
+    return { c, w, b, nota: Math.round(nota * 100) / 100, total: c + w + b, nokey, det, pts, max };
+  }
+
+  /* ---------- informe por alumno (jsPDF) ---------- */
+  function splitName(n) {
+    n = String(n || '').trim(); const i = n.indexOf(',');
+    if (i > 0) return { first: n.slice(i + 1).trim(), last: n.slice(0, i).trim() };
+    const p = n.split(/\s+/);
+    if (p.length >= 3) return { first: p.slice(0, -2).join(' '), last: p.slice(-2).join(' ') };
+    if (p.length === 2) return { first: p[0], last: p[1] };
+    return { first: '', last: n };
+  }
+
+  function drawReport(doc, o) {
+    const M = 18, RIGHT = 210 - M, GREEN = [34, 150, 84], RED = [205, 64, 60], GRAY = [130, 130, 130], INK = [25, 30, 36];
+    const nm = splitName(o.student);
+    const optT = (q, L) => { const t = o.key[q] && o.key[q].o && o.key[q].o[L]; return t ? `${L}) ${t}` : L; };
+    const runHead = () => {
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY);
+      doc.text(`${o.student}  ·  ${o.title || 'Examen'}`, M, 12);
+    };
+    // cabecera
+    let size = 22; doc.setFont('helvetica', 'normal'); doc.setFontSize(size);
+    const full = (nm.first ? nm.first + ' ' : '') + nm.last;
+    doc.setFont('helvetica', 'bold'); if (doc.getTextWidth(full) > 120) { size = 16; }
+    doc.setFontSize(size); doc.setFont('helvetica', 'normal'); doc.setTextColor(...INK);
+    let x = M;
+    if (nm.first) { doc.text(nm.first + ' ', x, M + 6); x += doc.getTextWidth(nm.first + ' '); }
+    doc.setFont('helvetica', 'bold'); doc.text(nm.last, x, M + 6);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(...GRAY);
+    if (o.group) doc.text(o.group, M, M + 13);
+    doc.setDrawColor(40); doc.setLineWidth(0.5); doc.line(M, M + 18, RIGHT, M + 18);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...INK);
+    const tl = doc.splitTextToSize(String(o.title || 'Examen'), 110);
+    doc.text(tl, M, M + 26);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRAY);
+    if (o.date) doc.text(o.date, M, M + 26 + tl.length * 4.6);
+    doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(...INK);
+    doc.text(o.res.nota.toFixed(2), RIGHT, M + 27, { align: 'right' });
+    doc.setFontSize(11); doc.text(`${o.res.c}/${o.res.max ? Math.round(o.res.max) : o.res.total}`, RIGHT, M + 33, { align: 'right' });
+    let y = M + 26 + Math.max(tl.length * 4.6 + (o.date ? 5 : 0), 12) + 4;
+    doc.setDrawColor(210); doc.setLineWidth(0.2);
+
+    const LW = 92, RX = RIGHT - 10, RWID = 66;
+    for (let q = 0; q < o.nq; q++) {
+      const k = o.key[q] || {}, st = o.res.det[q], a = o.ans[q] || '';
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
+      const left = doc.splitTextToSize(`${q + 1}. ${k.t || ''}`.trim(), LW);
+      const right = [];
+      if (st === 'void') right.push([ 'Pregunta anulada', GRAY ]);
+      else if (st === 'nokey') right.push([ a ? optT(q, a) : 'Sin responder', GRAY ], [ 'Sin clave de respuestas', GRAY ]);
+      else {
+        if (!a) right.push([ 'Sin responder', GRAY ]);
+        else if (a.length > 1) right.push([ 'Doble marca (' + a + ')', GRAY ]);
+        else doc.splitTextToSize(optT(q, a), RWID).forEach(t => right.push([ t, INK ]));
+        if (st !== 'ok') doc.splitTextToSize('Correcta: ' + k.a.split('').map(L => optT(q, L)).join(' / '), RWID).forEach(t => right.push([ t, GREEN ]));
+      }
+      const rowH = Math.max(left.length, right.length) * 4.1 + 5;
+      if (y + rowH > 284) { doc.addPage(); runHead(); y = 18; doc.setDrawColor(210); doc.setLineWidth(0.2); }
+      doc.line(M, y, RIGHT, y);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK);
+      doc.text(left, M, y + 5);
+      right.forEach(([t, col], i) => { doc.setTextColor(...col); doc.text(t, RX, y + 5 + i * 4.1, { align: 'right' }); });
+      // icono
+      const cx = RIGHT - 3, cy = y + 4.2;
+      if (st === 'ok' || st === 'bad' || st === 'blank') {
+        const good = st === 'ok'; const col = good ? GREEN : RED;
+        doc.setFillColor(...col); doc.circle(cx, cy, 2.6, 'F');
+        doc.setDrawColor(255); doc.setLineWidth(0.5);
+        if (good) { doc.line(cx - 1.2, cy + 0.1, cx - 0.3, cy + 1.1); doc.line(cx - 0.3, cy + 1.1, cx + 1.3, cy - 1.0); }
+        else { doc.line(cx - 1, cy - 1, cx + 1, cy + 1); doc.line(cx - 1, cy + 1, cx + 1, cy - 1); }
+        doc.setDrawColor(210); doc.setLineWidth(0.2);
+      } else if (st === 'void') {
+        doc.setDrawColor(...GRAY); doc.setLineWidth(0.4); doc.line(cx - 1.4, cy, cx + 1.4, cy); doc.setDrawColor(210); doc.setLineWidth(0.2);
+      }
+      y += rowH;
+    }
+    doc.line(M, y, RIGHT, y);
+  }
+
+  return { parseDelimited, namesFromRows, namesFromPdfLines, parseKeyText, keyFromRows, parseExamText, grade, splitName, drawReport };
+})();
+if (typeof module !== 'undefined') module.exports = LG;
+
+</script>
+<script>
+(() => {
+'use strict';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const sleep = () => new Promise(r => setTimeout(r, 0));
+const uid = () => Math.random().toString(36).slice(2, 9);
+const code4 = () => Array.from({ length: 4 }, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const fmtDate = iso => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? `${+m[3]}/${+m[2]}/${m[1]}` : ''; };
+const safeName = s => String(s || 'archivo').replace(/[\\/:*?"<>|]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
+const fold = OMR.fold;
+
+/* ---------- estado ---------- */
+const SKEY = 'corrector-test-v1';
+const newExam = () => ({ title: '', group: '', date: todayISO(), nq: 50, nopt: 4, scale: 10, penMode: 'none', penVal: 0.25, code: code4(), key: [] });
+let S = { roster: '', exam: newExam(), sheets: [] };
+try { const o = JSON.parse(localStorage.getItem(SKEY) || 'null'); if (o && o.exam) S = Object.assign(S, o); } catch (e) { /* sin almacenamiento */ }
+const mem = new Map(); // datos solo en memoria por hoja: {img, gray}
+let saveT = 0;
+const persist = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { /* ignorar */ } }, 250); };
+const blankKey = () => ({ a: '', x: false, p: 1, t: '', o: {} });
+function ensureKey() { const E = S.exam; if (!Array.isArray(E.key)) E.key = []; while (E.key.length < E.nq) E.key.push(blankKey()); }
+ensureKey();
+const students = () => S.roster.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+const LET = 'ABCDEFGH';
+
+/* ---------- avisos ---------- */
+let toastT = 0;
+function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = 'toast' + (err ? ' err' : ''); t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, err ? 6500 : 3500); }
+function ask(text, ok) {
+  return new Promise(res => {
+    $('#dlg-text').textContent = text; $('#dlg-ok').textContent = ok || 'Aceptar'; $('#dlg').hidden = false;
+    const done = v => { $('#dlg').hidden = true; $('#dlg-ok').onclick = $('#dlg-no').onclick = null; res(v); };
+    $('#dlg-ok').onclick = () => done(true); $('#dlg-no').onclick = () => done(false); $('#dlg-ok').focus();
+  });
+}
+const guard = fn => async (...a) => { try { await fn(...a); } catch (e) { console.error(e); toast('Algo ha fallado: ' + (e && e.message ? e.message : e), true); } };
+
+async function saveFile(name, data) {
+  try {
+    const blob = data instanceof Blob ? data : new Blob([data]);
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = safeName(name);
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    toast('Descargado: ' + safeName(name)); return true;
+  } catch (e) { toast('No se pudo guardar: ' + ((e && e.message) || e), true); return false; }
+}
+
+/* ---------- pasos ---------- */
+const STEPS = [['p1', 'Alumnos'], ['p2', 'Examen'], ['p3', 'Hojas'], ['p4', 'Escanear'], ['p5', 'Notas']];
+let step = 'p1';
+function badge(id) {
+  if (id === 'p1') return students().length + ' alumn.';
+  if (id === 'p2') { const n = S.exam.key.slice(0, S.exam.nq).filter(k => k.a || k.x).length; return n + '/' + S.exam.nq; }
+  if (id === 'p4') return S.sheets.length ? S.sheets.length + ' hojas' : '';
+  return '';
+}
+function renderSteps() {
+  $('#steps').innerHTML = STEPS.map(([id, t], i) => `<button class="step" data-go="${id}" aria-current="${id === step}"><span class="n">${i + 1}</span><span class="t">${t}</span><span class="b">${esc(badge(id))}</span></button>`).join('');
+}
+function showStep(id) {
+  step = id; STEPS.forEach(([p]) => { $('#' + p).hidden = p !== id; });
+  renderSteps();
+  if (id === 'p2') { fillExamFields(); renderKeyGrid(); }
+  if (id === 'p3') renderSheetPanel();
+  if (id === 'p4') renderScans();
+  if (id === 'p5') renderResults();
+  window.scrollTo({ top: 0 });
+}
+document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) showStep(b.dataset.go); });
+
+/* ---------- 1. alumnos ---------- */
+function rosterCount() { const n = students().length; $('#roster-count').textContent = n + (n === 1 ? ' alumno' : ' alumnos'); renderSteps(); }
+$('#roster').value = S.roster;
+$('#roster').addEventListener('input', e => { S.roster = e.target.value; rosterCount(); persist(); });
+$('#r-sort').onclick = () => { S.roster = students().sort((a, b) => a.localeCompare(b, 'es')).join('\n'); $('#roster').value = S.roster; persist(); };
+$('#r-dedupe').onclick = () => { const seen = new Set(); S.roster = students().filter(n => { const k = fold(n); if (seen.has(k)) return false; seen.add(k); return true; }).join('\n'); $('#roster').value = S.roster; rosterCount(); persist(); };
+$('#r-clear').onclick = guard(async () => { if (!students().length || await ask('¿Vaciar el listado de alumnos?', 'Vaciar')) { S.roster = ''; $('#roster').value = ''; rosterCount(); persist(); } });
+
+async function readText(file) {
+  const buf = await file.arrayBuffer();
+  let t = new TextDecoder('utf-8').decode(buf);
+  if (t.includes(String.fromCharCode(0xfffd))) t = new TextDecoder('windows-1252').decode(buf);
+  return t;
+}
+async function sheetRows(file) {
+  const wb = XLSX.read(await file.arrayBuffer(), { type: 'array' });
+  const ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' });
+}
+let pdfReady = false;
+function pdfInit() { if (!pdfReady) { pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; pdfReady = true; } }
+async function pdfLines(file) {
+  pdfInit();
+  const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise, lines = [];
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const tc = await (await pdf.getPage(p)).getTextContent(), rows = new Map();
+    tc.items.forEach(it => { const y = Math.round(it.transform[5] / 3); if (!rows.has(y)) rows.set(y, []); rows.get(y).push(it); });
+    Array.from(rows.keys()).sort((a, b) => b - a).forEach(y => lines.push(rows.get(y).sort((a, b) => a.transform[4] - b.transform[4]).map(i => i.str).join(' ').replace(/\s+/g, ' ').trim()));
+  }
+  return lines.filter(Boolean);
+}
+const ext = f => (f.name.split('.').pop() || '').toLowerCase();
+$('#f-roster').addEventListener('change', guard(async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let names;
+  if (ext(f) === 'pdf') names = LG.namesFromPdfLines(await pdfLines(f));
+  else if (ext(f) === 'xlsx' || ext(f) === 'xls') names = LG.namesFromRows(await sheetRows(f));
+  else names = LG.namesFromRows(LG.parseDelimited(await readText(f)));
+  if (!names.length) { toast('No he encontrado nombres en ese archivo. Pégalos en el cuadro, uno por línea.', true); return; }
+  S.roster = names.join('\n'); $('#roster').value = S.roster; rosterCount(); persist();
+  toast(names.length + ' alumnos cargados. Revisa la lista.');
+}));
+
+/* ---------- 2. examen y clave ---------- */
+function fillExamFields() {
+  const E = S.exam;
+  $('#ex-title').value = E.title; $('#ex-group').value = E.group; $('#ex-date').value = E.date; $('#ex-nq').value = E.nq;
+  $('#ex-nopt').value = String(E.nopt); $('#ex-scale').value = E.scale; $('#ex-pen').value = E.penMode; $('#ex-penval').value = E.penVal;
+  $('#pen-custom-wrap').hidden = E.penMode !== 'custom';
+}
+const bind = (id, fn) => $('#' + id).addEventListener('input', guard(e => { fn(e.target.value); persist(); renderSteps(); }));
+bind('ex-title', v => { S.exam.title = v; });
+bind('ex-group', v => { S.exam.group = v; });
+bind('ex-date', v => { S.exam.date = v; });
+bind('ex-scale', v => { const n = parseFloat(v); if (n > 0) S.exam.scale = n; });
+bind('ex-penval', v => { const n = parseFloat(v); if (n >= 0) S.exam.penVal = n; });
+$('#ex-pen').addEventListener('change', e => { S.exam.penMode = e.target.value; $('#pen-custom-wrap').hidden = e.target.value !== 'custom'; persist(); });
+$('#ex-nopt').addEventListener('change', e => { S.exam.nopt = +e.target.value; renderKeyGrid(); persist(); });
+$('#ex-nq').addEventListener('input', e => {
+  const n = Math.floor(+e.target.value);
+  if (n >= 1 && n <= 2000) { S.exam.nq = n; ensureKey(); renderKeyGrid(); persist(); renderSteps(); }
+});
+
+function keyRowHTML(q) {
+  const k = S.exam.key[q], n = S.exam.nopt, hasT = !!(k.t || Object.keys(k.o || {}).length);
+  const b = Array.from({ length: n }, (_, o) => `<button class="qb" data-q="${q}" data-o="${LET[o]}" aria-pressed="${k.a.includes(LET[o])}" aria-label="Pregunta ${q + 1}, opción ${LET[o]}">${LET[o]}</button>`).join('');
+  return `<div class="qrow${k.x ? ' void' : ''}${hasT ? ' has-text' : ''}" data-row="${q}" ${k.t ? `title="${esc(k.t)}"` : ''}><span class="qn">${q + 1}</span><div class="opts">${b}</div><button class="qv" data-q="${q}" data-v="1" aria-pressed="${!!k.x}" title="Anular pregunta">anular</button></div>`;
+}
+function renderKeyGrid() { ensureKey(); $('#keygrid').innerHTML = Array.from({ length: S.exam.nq }, (_, q) => keyRowHTML(q)).join(''); keyStat(); }
+function keyStat() {
+  const n = S.exam.key.slice(0, S.exam.nq).filter(k => k.a || k.x).length;
+  const c = $('#key-stat'); c.textContent = `${n} de ${S.exam.nq} con respuesta`; c.className = 'chip ' + (n === S.exam.nq ? 'ok' : 'warn'); renderSteps();
+}
+$('#keygrid').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const q = +b.dataset.q, k = S.exam.key[q];
+  if (b.dataset.o) {
+    const L = b.dataset.o;
+    if ($('#multi').checked) { const set = new Set(k.a.split('').filter(Boolean)); if (set.has(L)) set.delete(L); else set.add(L); k.a = Array.from(set).sort().join(''); }
+    else k.a = k.a === L ? '' : L;
+  } else if (b.dataset.v) k.x = !k.x;
+  const row = $(`[data-row="${q}"]`); const tmp = document.createElement('div'); tmp.innerHTML = keyRowHTML(q); row.replaceWith(tmp.firstElementChild);
+  keyStat(); persist();
+});
+$('#key-apply').onclick = guard(() => {
+  const arr = LG.parseKeyText($('#key-paste').value, S.exam.nq);
+  const n = arr.filter(Boolean).length;
+  if (!n) { toast('No he reconocido ninguna respuesta en el texto pegado.', true); return; }
+  arr.forEach((a, q) => { if (a) S.exam.key[q].a = a; });
+  renderKeyGrid(); persist(); toast(n + ' respuestas cargadas.');
+});
+$('#key-clear').onclick = guard(async () => { if (await ask('¿Borrar toda la clave (respuestas, anuladas y enunciados)?', 'Borrar')) { S.exam.key = []; ensureKey(); renderKeyGrid(); persist(); } });
+$('#key-tpl').onclick = guard(async () => {
+  ensureKey();
+  const h = ['Nº', 'Respuesta correcta', 'Puntos', 'Anulada', 'Enunciado'].concat(LET.slice(0, S.exam.nopt).split(''));
+  const rows = [h].concat(Array.from({ length: S.exam.nq }, (_, q) => { const k = S.exam.key[q]; return [q + 1, k.a, k.p || 1, k.x ? 'sí' : '', k.t || ''].concat(LET.slice(0, S.exam.nopt).split('').map(L => (k.o && k.o[L]) || '')); }));
+  const ws = XLSX.utils.aoa_to_sheet(rows); ws['!cols'] = [{ wch: 5 }, { wch: 18 }, { wch: 8 }, { wch: 9 }, { wch: 60 }].concat(LET.slice(0, S.exam.nopt).split('').map(() => ({ wch: 24 })));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Clave');
+  await saveFile('Plantilla de clave.xlsx', XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
+});
+$('#f-key').addEventListener('change', guard(async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let items;
+  if (ext(f) === 'pdf' || ext(f) === 'txt') {
+    const text = ext(f) === 'pdf' ? (await pdfLines(f)).join('\n') : await readText(f);
+    items = LG.parseExamText(text);
+    if (!items.length) { const arr = LG.parseKeyText(text, S.exam.nq); items = arr.map((a, q) => ({ q, a, p: 1, x: false, t: '', o: {} })).filter(i => i.a); }
+  } else {
+    const rows = (ext(f) === 'xlsx' || ext(f) === 'xls') ? await sheetRows(f) : LG.parseDelimited(await readText(f));
+    items = LG.keyFromRows(rows);
+  }
+  if (!items.length) { toast('No he reconocido preguntas ni respuestas en ese archivo. Prueba con la plantilla de clave.', true); return; }
+  const maxQ = Math.max(...items.map(i => i.q)) + 1;
+  if (maxQ > S.exam.nq) { S.exam.nq = Math.min(2000, maxQ); $('#ex-nq').value = S.exam.nq; }
+  ensureKey();
+  items.forEach(i => { if (i.q >= S.exam.key.length) return; const k = S.exam.key[i.q]; if (i.a) k.a = i.a; if (i.p) k.p = i.p; if (i.x) k.x = true; if (i.t) k.t = i.t; if (i.o && Object.keys(i.o).length) k.o = i.o; });
+  const maxO = Math.max(0, ...items.map(i => Object.keys(i.o || {}).length));
+  if (maxO > S.exam.nopt && maxO <= 6) { S.exam.nopt = maxO; $('#ex-nopt').value = String(maxO); }
+  renderKeyGrid(); persist();
+  toast(`${items.length} preguntas leídas, ${items.filter(i => i.a).length} con respuesta. Revisa la clave.`);
+}));
+
+/* ---------- 3. hojas ---------- */
+function canvasDoc(cv, sc) {
+  const ctx = cv.getContext('2d'); let fill = '#000', draw = '#000', lw = 0.2, fs = 10, bold = false, tc = '#000';
+  const col = a => a.length === 1 ? `rgb(${a[0]},${a[0]},${a[0]})` : `rgb(${a[0]},${a[1]},${a[2]})`;
+  const font = () => { ctx.font = `${bold ? '700' : '400'} ${fs * 0.3528 * sc}px ${getComputedStyle(document.body).fontFamily || 'sans-serif'}`; };
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+  const d = {
+    setFillColor: (...a) => { fill = col(a); }, setDrawColor: (...a) => { draw = col(a); }, setLineWidth: w => { lw = w; },
+    setFont: (f, s) => { bold = s === 'bold'; }, setFontSize: s => { fs = s; }, setTextColor: (...a) => { tc = col(a); },
+    rect(x, y, w, h, st) { if (st.includes('F')) { ctx.fillStyle = fill; ctx.fillRect(x * sc, y * sc, w * sc, h * sc); } if (st.includes('S')) { ctx.strokeStyle = draw; ctx.lineWidth = Math.max(1, lw * sc); ctx.strokeRect(x * sc, y * sc, w * sc, h * sc); } },
+    circle(x, y, r, st) { ctx.beginPath(); ctx.arc(x * sc, y * sc, r * sc, 0, 7); if (st.includes('F')) { ctx.fillStyle = fill; ctx.fill(); } if (st.includes('S') || st.includes('D')) { ctx.strokeStyle = draw; ctx.lineWidth = Math.max(1, lw * sc); ctx.stroke(); } },
+    line(a, b, c, e) { ctx.beginPath(); ctx.moveTo(a * sc, b * sc); ctx.lineTo(c * sc, e * sc); ctx.strokeStyle = draw; ctx.lineWidth = Math.max(1, lw * sc); ctx.stroke(); },
+    text(s, x, y, o) { font(); ctx.fillStyle = tc; ctx.textAlign = (o && o.align) || 'left'; (Array.isArray(s) ? s : [s]).forEach((ln, i) => ctx.fillText(ln, x * sc, (y + i * fs * 0.3528 * 1.2) * sc)); },
+    splitTextToSize(s, w) { font(); const out = []; let cur = ''; String(s).split(' ').forEach(wd => { const t = cur ? cur + ' ' + wd : wd; if (ctx.measureText(t).width > w * sc && cur) { out.push(cur); cur = wd; } else cur = t; }); if (cur) out.push(cur); return out; }
+  };
+  return d;
+}
+function sheetInfo(name, idx, page) {
+  const E = S.exam;
+  return { title: E.title || 'Examen', group: E.group, date: fmtDate(E.date), name, idx, page, pages: OMR.pagesFor(E.nq), nq: E.nq, nopt: E.nopt, code: E.code };
+}
+function renderSheetPanel() {
+  const st = students(), E = S.exam, pages = OMR.pagesFor(E.nq);
+  $('#sheet-sum').innerHTML = st.length
+    ? `<b>${st.length}</b> alumnos × <b>${pages}</b> ${pages === 1 ? 'hoja' : 'hojas'} = <b>${st.length * pages}</b> páginas A4 · ${E.nq} preguntas · opciones A–${LET[E.nopt - 1]}`
+    : 'Añade primero el listado de alumnos (paso 1).';
+  const sel = $('#sheet-who'), cur = sel.value;
+  sel.innerHTML = `<option value="all">Todos los alumnos</option>` + st.map((n, i) => `<option value="${i + 1}">${esc(n)}</option>`).join('');
+  if (Array.from(sel.options).some(o => o.value === cur)) sel.value = cur;
+  const cv = $('#preview'); cv.width = 420; cv.height = 594;
+  OMR.drawSheetPage(canvasDoc(cv, 2), qrcode, sheetInfo(st[0] || 'Nombre Apellidos', 1, 0));
+}
+$('#sheet-gen').onclick = guard(async () => {
+  const st = students(), E = S.exam;
+  if (!st.length) { toast('Añade primero el listado de alumnos.', true); return; }
+  const who = $('#sheet-who').value, list = who === 'all' ? st.map((n, i) => [n, i + 1]) : [[st[+who - 1], +who]];
+  const pages = OMR.pagesFor(E.nq), total = list.length * pages, btn = $('#sheet-gen');
+  btn.disabled = true;
+  try {
+    const doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' }); let n = 0;
+    for (const [name, idx] of list) for (let p = 0; p < pages; p++) {
+      if (n) doc.addPage();
+      OMR.drawSheetPage(doc, qrcode, sheetInfo(name, idx, p));
+      n++; if (n % 3 === 0) { $('#sheet-prog').textContent = `Preparando ${n} de ${total}…`; await sleep(); }
+    }
+    $('#sheet-prog').textContent = '';
+    await saveFile(`Hojas - ${E.title || 'examen'}${who === 'all' ? '' : ' - ' + list[0][0]}.pdf`, doc.output('blob'));
+  } finally { btn.disabled = false; $('#sheet-prog').textContent = ''; }
+});
+
+/* ---------- 4. escanear ---------- */
+async function fileToCanvas(file, maxSide) {
+  let bmp;
+  try { bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }); }
+  catch (e) { bmp = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error('No se pudo abrir la imagen')); i.src = URL.createObjectURL(file); }); }
+  const w = bmp.width || bmp.naturalWidth, h = bmp.height || bmp.naturalHeight, sc = Math.min(1, maxSide / Math.max(w, h));
+  const cv = document.createElement('canvas'); cv.width = Math.round(w * sc); cv.height = Math.round(h * sc);
+  cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+  if (bmp.close) bmp.close();
+  return cv;
+}
+function toGray(cv) {
+  const w = cv.width, h = cv.height, d = cv.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data, g = new Uint8ClampedArray(w * h);
+  for (let i = 0, j = 0; i < g.length; i++, j += 4) g[i] = (d[j] * 77 + d[j + 1] * 150 + d[j + 2] * 29) >> 8;
+  return { g, w, h };
+}
+function grayToURL(g, w, h, q) {
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d'), im = ctx.createImageData(w, h);
+  for (let i = 0; i < g.length; i++) { im.data[i * 4] = im.data[i * 4 + 1] = im.data[i * 4 + 2] = g[i]; im.data[i * 4 + 3] = 255; }
+  ctx.putImageData(im, 0, 0); return cv.toDataURL('image/jpeg', q || 0.82);
+}
+function smallURL(cv) {
+  const sc = 220 / Math.max(cv.width, cv.height), c = document.createElement('canvas'); c.width = Math.max(1, Math.round(cv.width * sc)); c.height = Math.max(1, Math.round(cv.height * sc));
+  c.getContext('2d').drawImage(cv, 0, 0, c.width, c.height); return c.toDataURL('image/jpeg', 0.6);
+}
+function resolveStudent(p) {
+  const st = students(); if (!p) return { sid: 0, note: '' };
+  const byIdx = st[p.idx - 1];
+  if (byIdx && fold(byIdx) === p.name) return { sid: p.idx, note: '' };
+  const m = st.map((n, i) => [fold(n), i + 1]).filter(([f]) => f === p.name);
+  if (m.length === 1) return { sid: m[0][1], note: '' };
+  if (byIdx) return { sid: p.idx, note: `El nombre impreso (${p.name}) no coincide con el del listado actual.` };
+  return { sid: 0, note: '' };
+}
+const needsReview = a => a.state === 'doubt' || a.state === 'multi' || a.state === 'check';
+const activeSheets = sid => S.sheets.filter(s => s.sid === sid && !s.ignored && !s.err);
+function pending(sh) { return sh.err ? 0 : sh.ans.filter(a => needsReview(a) && !sh.fixed[a.q]).length + (sh.sid ? 0 : 1); }
+
+function ingest(r, label, thumb) {
+  const E = S.exam, sh = { id: uid(), src: label, sid: 0, page: 0, pages: 1, nq: E.nq, nopt: E.nopt, code: '', nameQR: '', hasQR: false, ans: [], fixed: {}, warn: [], err: '', dup: false, ignored: false };
+  mem.set(sh.id, { img: r.rect ? grayToURL(r.rect, OMR.RW, OMR.RH) : thumb, gray: null, thumb });
+  if (!r.ok) { sh.err = r.error; S.sheets.push(sh); return sh; }
+  if (r.payload) {
+    const p = r.payload, rs = resolveStudent(p);
+    Object.assign(sh, { sid: rs.sid, page: p.page, pages: p.pages, nq: p.nq, nopt: p.nopt, code: p.code, nameQR: p.name, hasQR: true });
+    if (rs.note) sh.warn.push(rs.note);
+    if (p.code !== E.code) sh.warn.push(`Esta hoja es de otro examen (código ${p.code}); este es ${E.code}.`);
+    else if (p.nq !== E.nq) sh.warn.push(`La hoja tiene ${p.nq} preguntas y el examen actual ${E.nq}.`);
+  } else {
+    mem.get(sh.id).gray = r.rect; sh.warn.push('No se ha podido leer el QR: asigna el alumno a mano.');
+  }
+  sh.warn.push(...r.warn);
+  sh.ans = r.answers.map(a => ({ q: a.q, pick: a.pick, state: a.state }));
+  S.sheets.push(sh); markDups(); return sh;
+}
+function markDups() {
+  const seen = new Map();
+  S.sheets.forEach(s => {
+    s.dup = false; if (s.err || !s.sid || s.ignored) return;
+    const k = s.sid + ':' + s.page;
+    if (seen.has(k)) s.dup = true; else seen.set(k, s.id);
+  });
+}
+async function processCanvas(cv, label) {
+  const { g, w, h } = toGray(cv), E = S.exam;
+  const r = OMR.scan(g, w, h, { nq: E.nq, nopt: E.nopt, page: 0 });
+  ingest(r, label, smallURL(cv));
+}
+async function handleFiles(files) {
+  const list = Array.from(files); if (!list.length) return;
+  const prog = $('#scan-prog'); let done = 0;
+  for (const f of list) {
+    if (/\.pdf$/i.test(f.name) || f.type === 'application/pdf') {
+      pdfInit();
+      const pdf = await pdfjsLib.getDocument({ data: await f.arrayBuffer() }).promise;
+      for (let p = 1; p <= pdf.numPages; p++) {
+        prog.textContent = `Leyendo ${f.name}, página ${p} de ${pdf.numPages}…`; await sleep();
+        const page = await pdf.getPage(p), v1 = page.getViewport({ scale: 1 }), sc = 2400 / Math.max(v1.width, v1.height), vp = page.getViewport({ scale: sc });
+        const cv = document.createElement('canvas'); cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+        await page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise;
+        await processCanvas(cv, `${f.name} · pág. ${p}`); page.cleanup(); renderScans();
+      }
+    } else {
+      done++; prog.textContent = `Leyendo ${f.name}…`; await sleep();
+      await processCanvas(await fileToCanvas(f, 2600), f.name); renderScans();
+    }
+  }
+  prog.textContent = ''; persist(); renderSteps(); renderScans();
+}
+const onFiles = guard(async e => { const fs = Array.from(e.target.files); e.target.value = ''; await handleFiles(fs); });
+$('#f-cam').addEventListener('change', onFiles);
+$('#f-scan').addEventListener('change', onFiles);
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', guard(async e => { await handleFiles(e.dataTransfer.files); }));
+
+function sheetName(sh) { const st = students(); return sh.sid && st[sh.sid - 1] ? st[sh.sid - 1] : ''; }
+function renderScans() {
+  const sum = $('#scan-sum'), box = $('#sheets'), st = students();
+  if (!S.sheets.length) { sum.innerHTML = ''; box.innerHTML = '<div class="empty">Todavía no has escaneado ninguna hoja.</div>'; return; }
+  markDups();
+  const ok = S.sheets.filter(s => !s.err), errs = S.sheets.length - ok.length, pend = ok.filter(s => pending(s) > 0).length;
+  const have = new Set(ok.filter(s => s.sid && !s.dup).map(s => s.sid));
+  sum.innerHTML = `<span class="chip">${ok.length} leídas</span>` + (pend ? `<span class="chip warn">${pend} con dudas</span>` : '<span class="chip ok">sin dudas pendientes</span>') + (errs ? `<span class="chip bad">${errs} con error</span>` : '') + (st.length ? `<span class="chip">${have.size} de ${st.length} alumnos</span>` : '');
+  const order = [...S.sheets].sort((a, b) => (b.err ? 1 : 0) - (a.err ? 1 : 0) || (pending(b) > 0) - (pending(a) > 0) || (a.sid || 1e6) - (b.sid || 1e6) || a.page - b.page);
+  box.innerHTML = order.map(sh => {
+    const m = mem.get(sh.id) || {}, nm = sheetName(sh), pn = pending(sh), chips = [];
+    if (sh.err) chips.push(`<span class="chip bad">No se pudo leer</span>`);
+    else {
+      if (!sh.sid) chips.push('<span class="chip bad">Sin alumno</span>');
+      if (pn > 0) chips.push(`<span class="chip warn">Revisar ${pn}</span>`); else if (sh.sid) chips.push('<span class="chip ok">Lista</span>');
+      if (sh.dup) chips.push('<span class="chip warn">Duplicada</span>');
+      if (sh.ignored) chips.push('<span class="chip">Ignorada</span>');
+      if (sh.warn.some(w => /otro examen|preguntas y el examen/.test(w))) chips.push('<span class="chip warn">Otro examen</span>');
+    }
+    return `<article class="sc" data-id="${sh.id}"><img class="th" alt="" src="${m.img || m.thumb || 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='}"><div><div class="nm">${esc(nm || sh.nameQR || 'Hoja sin alumno')}</div><div class="meta">${sh.err ? esc(sh.err) : `Hoja ${sh.page + 1} de ${sh.pages} · ${esc(sh.src)}`}</div><div class="chips">${chips.join('')}</div></div><div class="acts">${sh.err ? '' : '<button class="btn sm primary" data-a="rev">Revisar</button>'}<button class="btn sm ghost danger" data-a="del">Quitar</button></div></article>`;
+  }).join('');
+}
+$('#sheets').addEventListener('click', guard(async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const id = b.closest('.sc').dataset.id, sh = S.sheets.find(s => s.id === id); if (!sh) return;
+  if (b.dataset.a === 'rev') openReview(id);
+  if (b.dataset.a === 'del') { S.sheets = S.sheets.filter(s => s.id !== id); mem.delete(id); markDups(); persist(); renderScans(); renderSteps(); }
+}));
+
+/* ---------- revisión de una hoja ---------- */
+let revId = null, revTab = 'dud';
+const imgCache = new Map();
+function loadImg(url) {
+  if (imgCache.has(url)) return imgCache.get(url);
+  const p = new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+  imgCache.set(url, p); return p;
+}
+const STATE_TXT = { doubt: ['Marca muy débil', 'warn'], multi: ['Doble marca', 'warn'], check: ['Posible borrado', 'warn'], blank: ['En blanco', ''], ok: ['', ''] };
+function openReview(id) { revId = id; revTab = 'dud'; renderReview(); $('#modal').hidden = false; $('#modal').scrollTop = 0; }
+function closeReview() { $('#modal').hidden = true; revId = null; persist(); renderScans(); renderSteps(); if (step === 'p5') renderResults(); }
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden && $('#dlg').hidden) closeReview(); });
+$('#modal').addEventListener('click', e => { if (e.target === $('#modal')) closeReview(); });
+
+function renderReview() {
+  const sh = S.sheets.find(s => s.id === revId); if (!sh) { closeReview(); return; }
+  const st = students(), list = revTab === 'dud' ? sh.ans.filter(a => needsReview(a) && !sh.fixed[a.q]) : sh.ans;
+  const dudN = sh.ans.filter(a => needsReview(a) && !sh.fixed[a.q]).length;
+  $('#mpanel').innerHTML = `
+    <div class="mh"><h2>Revisar hoja</h2><button class="btn sm" id="m-close">Cerrar</button></div>
+    <div class="grid">
+      <label class="f">Alumno<select id="m-st"><option value="0">(sin asignar)</option>${st.map((n, i) => `<option value="${i + 1}" ${sh.sid === i + 1 ? 'selected' : ''}>${esc(n)}</option>`).join('')}</select></label>
+      ${!sh.hasQR && OMR.pagesFor(S.exam.nq) > 1 ? `<label class="f">Hoja del examen<select id="m-pg">${Array.from({ length: OMR.pagesFor(S.exam.nq) }, (_, p) => `<option value="${p}" ${p === sh.page ? 'selected' : ''}>Hoja ${p + 1}</option>`).join('')}</select></label>` : ''}
+    </div>
+    ${sh.warn.map(w => `<div class="warnbox">${esc(w)}</div>`).join('')}
+    ${sh.dup ? `<div class="warnbox">Ya hay otra hoja de este alumno. <button class="btn sm" id="m-use">Usar esta en su lugar</button></div>` : ''}
+    ${sh.ignored ? `<div class="warnbox">Esta hoja está ignorada. <button class="btn sm" id="m-unign">Volver a usarla</button></div>` : ''}
+    <div class="tabs"><button class="tab" data-t="dud" aria-pressed="${revTab === 'dud'}">Para revisar (${dudN})</button><button class="tab" data-t="all" aria-pressed="${revTab === 'all'}">Todas (${sh.ans.length})</button><button class="tab" data-t="img" aria-pressed="${revTab === 'img'}">Hoja completa</button></div>
+    <div id="m-body" style="display:flex;flex-direction:column;gap:10px"></div>`;
+  const body = $('#m-body');
+  if (revTab === 'img') {
+    body.innerHTML = `<canvas id="m-full" class="full"></canvas><p class="hint">Verde: respuesta leída. Ámbar: marca que conviene comprobar.</p>`; drawFull(sh);
+  } else if (!list.length) {
+    body.innerHTML = `<div class="empty">${revTab === 'dud' ? 'No queda ninguna marca dudosa en esta hoja.' : 'Sin preguntas.'}</div>`;
+  } else {
+    body.innerHTML = list.map(a => {
+      const [txt, cls] = STATE_TXT[a.state] || ['', ''], n = sh.nopt;
+      return `<div class="qi" data-q="${a.q}"><div class="qi-h"><b>Pregunta ${a.q + 1}</b>${txt ? `<span class="chip ${cls}">${txt}</span>` : ''}</div><canvas class="crop" data-q="${a.q}"></canvas><div class="pick">${Array.from({ length: n }, (_, o) => `<button class="qb" data-p="${LET[o]}" aria-pressed="${a.pick === LET[o]}" aria-label="Opción ${LET[o]}">${LET[o]}</button>`).join('')}<button class="qb blank" data-p="" aria-pressed="${a.pick === ''}">En blanco</button></div></div>`;
+    }).join('');
+    drawCrops(sh);
+  }
+}
+async function drawCrops(sh) {
+  const m = mem.get(sh.id); if (!m || !m.img) return;
+  const img = await loadImg(m.img), L = OMR.layout(sh.nq, sh.page, sh.nopt), SC = OMR.SC;
+  $$('canvas.crop').forEach(cv => {
+    const q = +cv.dataset.q, i = q - L.first, col = Math.floor(i / OMR.ROWS), bub = L.bubbles.find(b => b.q === q);
+    if (!bub) return;
+    const bx = L.x0 + col * (L.blockW + L.gap), by = bub.y;
+    const sx = (bx - 2) * SC, sy = (by - 4.4) * SC, sw = (L.blockW + 4) * SC, sh2 = 8.8 * SC;
+    cv.width = Math.round(sw * 2); cv.height = Math.round(sh2 * 2);
+    cv.getContext('2d').drawImage(img, sx, sy, sw, sh2, 0, 0, cv.width, cv.height);
+    cv.style.width = Math.min(460, cv.width) + 'px';
+  });
+}
+async function drawFull(sh) {
+  const m = mem.get(sh.id), cv = $('#m-full'); if (!cv) return;
+  if (!m || !m.img) { cv.replaceWith(Object.assign(document.createElement('p'), { className: 'empty', textContent: 'La imagen de esta hoja ya no está disponible (se pierde al recargar la página).' })); return; }
+  const img = await loadImg(m.img), SC = OMR.SC, k = 0.8;
+  cv.width = img.width * k; cv.height = img.height * k;
+  const ctx = cv.getContext('2d'); ctx.drawImage(img, 0, 0, cv.width, cv.height);
+  const L = OMR.layout(sh.nq, sh.page, sh.nopt);
+  sh.ans.forEach(a => {
+    if (!a.pick) return;
+    a.pick.split('').forEach(Lt => {
+      const b = L.bubbles.find(x => x.q === a.q && x.o === LET.indexOf(Lt)); if (!b) return;
+      ctx.beginPath(); ctx.arc(b.x * SC * k, b.y * SC * k, (L.d / 2 + 0.7) * SC * k, 0, 7);
+      ctx.lineWidth = 2.4; ctx.strokeStyle = needsReview(a) && !sh.fixed[a.q] ? '#e39b1c' : '#1fa463'; ctx.stroke();
+    });
+  });
+}
+$('#mpanel').addEventListener('click', guard(async e => {
+  const sh = S.sheets.find(s => s.id === revId); if (!sh) return;
+  const t = e.target.closest('button'); if (!t) return;
+  if (t.id === 'm-close') return closeReview();
+  if (t.id === 'm-use') { S.sheets.forEach(s => { if (s !== sh && s.sid === sh.sid && s.page === sh.page) s.ignored = true; }); sh.ignored = false; markDups(); persist(); renderReview(); return; }
+  if (t.id === 'm-unign') { sh.ignored = false; markDups(); persist(); renderReview(); return; }
+  if (t.dataset.t) { revTab = t.dataset.t; renderReview(); return; }
+  if (t.dataset.p !== undefined) {
+    const qi = t.closest('.qi'), q = +qi.dataset.q, a = sh.ans.find(x => x.q === q);
+    a.pick = t.dataset.p; a.state = a.pick ? 'ok' : 'blank'; sh.fixed[q] = true; persist();
+    if (revTab === 'dud') renderReview(); else $$('.qb', qi).forEach(b => b.setAttribute('aria-pressed', String(b.dataset.p === a.pick)));
+  }
+}));
+$('#mpanel').addEventListener('change', guard(async e => {
+  const sh = S.sheets.find(s => s.id === revId); if (!sh) return;
+  if (e.target.id === 'm-st') { sh.sid = +e.target.value; markDups(); persist(); renderReview(); }
+  if (e.target.id === 'm-pg') {
+    const m = mem.get(sh.id); if (!m || !m.gray) return;
+    sh.page = +e.target.value; sh.pages = OMR.pagesFor(S.exam.nq);
+    sh.ans = OMR.read(m.gray, S.exam.nq, sh.page, S.exam.nopt).map(a => ({ q: a.q, pick: a.pick, state: a.state })); sh.fixed = {};
+    markDups(); persist(); renderReview();
+  }
+}));
+
+/* ---------- 5. notas ---------- */
+function studentResult(sid) {
+  const E = S.exam, sheets = activeSheets(sid);
+  if (!sheets.length) return null;
+  const ans = [], pagesSeen = new Set(), pend = sheets.reduce((n, s) => n + pending(s), 0);
+  sheets.forEach(s => { pagesSeen.add(s.page); s.ans.forEach(a => { ans[a.q] = a.pick; }); });
+  const res = LG.grade(E.key, ans, { nq: E.nq, nopt: E.nopt, penMode: E.penMode, penVal: E.penVal, scale: E.scale });
+  const need = OMR.pagesFor(E.nq);
+  return { res, ans, pend, pagesSeen: pagesSeen.size, need, missing: pagesSeen.size < need };
+}
+function allResults() {
+  return students().map((name, i) => ({ sid: i + 1, name, r: studentResult(i + 1) }));
+}
+const fmt2 = n => n.toFixed(2);
+function renderResults() {
+  const E = S.exam, rows = allResults(), done = rows.filter(r => r.r), noKey = E.key.slice(0, E.nq).filter(k => !k.a && !k.x).length;
+  const warns = [];
+  if (!students().length) warns.push('Falta el listado de alumnos (paso 1).');
+  if (noKey === E.nq) warns.push('Todavía no hay clave de respuestas (paso 2): sin ella todas las respuestas cuentan como fallo.');
+  else if (noKey) warns.push(`${noKey} preguntas no tienen respuesta en la clave y no cuentan en la nota.`);
+  const orphan = S.sheets.filter(s => !s.err && !s.sid && !s.ignored).length;
+  if (orphan) warns.push(`${orphan} hojas sin alumno asignado (paso 4).`);
+  const pendTot = done.reduce((n, r) => n + r.r.pend, 0);
+  if (pendTot) warns.push(`Quedan ${pendTot} marcas dudosas sin revisar; esas preguntas pueden estar mal puntuadas.`);
+  $('#res-warn').innerHTML = warns.map(w => `<div class="warnbox">${esc(w)}</div>`).join('');
+  const notas = done.map(r => r.r.res.nota), avg = notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : 0;
+  const pass = notas.filter(n => n >= E.scale / 2).length;
+  $('#res-stats').innerHTML = [[`${done.length}/${rows.length}`, 'alumnos con hoja'], [notas.length ? fmt2(avg) : '–', 'nota media'], [notas.length ? Math.round(pass / notas.length * 100) + ' %' : '–', 'aprobados'], [notas.length ? fmt2(Math.max(...notas)) + ' / ' + fmt2(Math.min(...notas)) : '–', 'máx. / mín.']]
+    .map(([a, b]) => `<div class="stat"><b>${a}</b><span>${b}</span></div>`).join('');
+  $('#restbl').innerHTML = `<thead><tr><th>Alumno</th><th class="num">Aciertos</th><th class="num">Fallos</th><th class="num">Blanco</th><th class="num">Nota</th><th>Estado</th><th></th></tr></thead><tbody>` + (rows.length ? rows.map(({ sid, name, r }) => {
+    if (!r) return `<tr><td>${esc(name)}</td><td class="num">–</td><td class="num">–</td><td class="num">–</td><td class="num nota">–</td><td><span class="chip">Sin hoja</span></td><td></td></tr>`;
+    const chip = r.missing ? `<span class="chip warn">Faltan hojas (${r.pagesSeen}/${r.need})</span>` : r.pend ? `<span class="chip warn">Revisar ${r.pend}</span>` : '<span class="chip ok">Lista</span>';
+    return `<tr data-sid="${sid}"><td>${esc(name)}</td><td class="num">${r.res.c}</td><td class="num">${r.res.w}</td><td class="num">${r.res.b}</td><td class="num nota">${fmt2(r.res.nota)}</td><td>${chip}</td><td><button class="btn sm ghost" data-a="rev">Ver hoja</button> <button class="btn sm ghost" data-a="rep">Informe</button></td></tr>`;
+  }).join('') : `<tr><td colspan="7" class="empty">Sin alumnos.</td></tr>`) + '</tbody>';
+  // reparto
+  const bins = 10, cnt = new Array(bins).fill(0); notas.forEach(n => { cnt[Math.min(bins - 1, Math.floor(n / E.scale * bins))]++; });
+  const mx = Math.max(1, ...cnt);
+  $('#hist').innerHTML = cnt.map((c, i) => `<div title="${c} alumnos"><span>${c || ''}</span><i style="height:${Math.round(c / mx * 62)}px"></i><span>${Math.round(i * E.scale / bins * 10) / 10}</span></div>`).join('');
+  $('#hist-card').hidden = !notas.length;
+  // por pregunta
+  const tot = new Array(E.nq).fill(0), okc = new Array(E.nq).fill(0);
+  done.forEach(r => r.r.res.det.forEach((d, q) => { if (d === 'ok' || d === 'bad' || d === 'blank') { tot[q]++; if (d === 'ok') okc[q]++; } }));
+  $('#qbars').innerHTML = tot.map((t, q) => { if (!t) return ''; const p = Math.round(okc[q] / t * 100); return `<div class="qbar${p < 30 ? ' low' : ''}"><span>${q + 1}</span><i style="--w:${p}%"></i><span>${p}%</span></div>`; }).join('') || '<span class="hint">Aún no hay datos.</span>';
+}
+$('#restbl').addEventListener('click', guard(async e => {
+  const b = e.target.closest('button'); if (!b) return;
+  const sid = +b.closest('tr').dataset.sid;
+  if (b.dataset.a === 'rev') { const s = activeSheets(sid)[0]; if (s) openReview(s.id); }
+  if (b.dataset.a === 'rep') {
+    const r = studentResult(sid); if (!r) return;
+    const doc = reportDoc([{ sid, name: students()[sid - 1], r }]);
+    await saveFile(`Informe - ${students()[sid - 1]}.pdf`, doc.output('blob'));
+  }
+}));
+
+function reportDoc(list) {
+  const E = S.exam, doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+  list.forEach((it, i) => {
+    if (i) doc.addPage();
+    LG.drawReport(doc, { student: it.name, group: E.group, title: E.title, date: fmtDate(E.date), res: it.r.res, key: E.key, ans: it.r.ans, nq: E.nq });
+  });
+  return doc;
+}
+const doneList = () => allResults().filter(r => r.r);
+function notesRows() {
+  const E = S.exam;
+  return [['Alumno', 'Nota', 'Aciertos', 'Fallos', 'En blanco', 'Preguntas', 'Estado']].concat(allResults().map(({ name, r }) => r
+    ? [name, r.res.nota, r.res.c, r.res.w, r.res.b, E.nq, r.missing ? 'Faltan hojas' : r.pend ? 'Con dudas sin revisar' : 'Lista']
+    : [name, '', '', '', '', E.nq, 'Sin hoja']));
+}
+$('#x-xlsx').onclick = guard(async () => {
+  const ws = XLSX.utils.aoa_to_sheet(notesRows()); ws['!cols'] = [{ wch: 36 }, { wch: 8 }, { wch: 10 }, { wch: 8 }, { wch: 10 }, { wch: 10 }, { wch: 22 }];
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Notas');
+  await saveFile(`Notas - ${S.exam.title || 'examen'}.xlsx`, XLSX.write(wb, { type: 'array', bookType: 'xlsx' }));
+});
+$('#x-csv').onclick = guard(async () => {
+  const q = v => { const s = typeof v === 'number' ? String(v).replace('.', ',') : String(v); return /[;"\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  await saveFile(`Notas - ${S.exam.title || 'examen'}.csv`, '﻿' + notesRows().map(r => r.map(q).join(';')).join('\r\n'));
+});
+$('#x-pdf').onclick = guard(async () => {
+  const l = doneList(); if (!l.length) { toast('Todavía no hay alumnos con hoja escaneada.', true); return; }
+  await saveFile(`Informes - ${S.exam.title || 'examen'}.pdf`, reportDoc(l.map(x => ({ sid: x.sid, name: x.name, r: x.r }))).output('blob'));
+});
+$('#x-zip').onclick = guard(async () => {
+  const l = doneList(); if (!l.length) { toast('Todavía no hay alumnos con hoja escaneada.', true); return; }
+  const zip = new JSZip(), used = new Set(); let n = 0;
+  for (const x of l) {
+    let nm = safeName(x.name), k = nm, c = 2; while (used.has(k)) k = nm + ' ' + c++; used.add(k);
+    zip.file(`${k}.pdf`, reportDoc([{ sid: x.sid, name: x.name, r: x.r }]).output('arraybuffer'));
+    n++; if (n % 3 === 0) { $('#x-prog').textContent = `Informe ${n} de ${l.length}…`; await sleep(); }
+  }
+  $('#x-prog').textContent = 'Comprimiendo…'; await sleep();
+  const blob = await zip.generateAsync({ type: 'blob' }); $('#x-prog').textContent = '';
+  await saveFile(`Informes - ${S.exam.title || 'examen'}.zip`, blob);
+});
+
+/* ---------- proyecto ---------- */
+$('#btn-save').onclick = guard(async () => {
+  const data = JSON.stringify({ app: 'corrector-test', v: 1, roster: S.roster, exam: S.exam, sheets: S.sheets }, null, 1);
+  await saveFile(`Proyecto - ${S.exam.title || 'examen'}.json`, data);
+});
+$('#f-proj').addEventListener('change', guard(async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const o = JSON.parse(await f.text());
+  if (!o || o.app !== 'corrector-test' || !o.exam) { toast('Ese archivo no es un proyecto de Corrector de Test.', true); return; }
+  if (!await ask('Se sustituirá el trabajo actual por el del archivo. ¿Continuar?', 'Abrir')) return;
+  S = { roster: o.roster || '', exam: Object.assign(newExam(), o.exam), sheets: Array.isArray(o.sheets) ? o.sheets : [] };
+  mem.clear(); ensureKey(); $('#roster').value = S.roster; rosterCount(); persist(); showStep('p1'); toast('Proyecto abierto.');
+}));
+$('#btn-new').onclick = guard(async () => {
+  if (!await ask('Empezar un examen nuevo borra la clave y las hojas escaneadas. Los alumnos se mantienen. ¿Seguro?', 'Empezar')) return;
+  S.exam = newExam(); S.sheets = []; mem.clear(); ensureKey(); persist(); showStep('p2'); toast('Examen nuevo listo.');
+});
+
+/* ---------- arranque ---------- */
+rosterCount(); showStep('p1');
+})();
+
+</script>
+
+</body>
+</html>

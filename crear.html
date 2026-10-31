@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Generador de tests</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/estilos.css">
+<style>
+.qcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}
+.qcard .qh{display:flex;gap:8px;align-items:flex-start}
+.qcard .qt{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere}
+.qcard ol{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:4px}
+.qcard li{display:flex;gap:8px;align-items:flex-start}
+.qcard li span{overflow-wrap:anywhere;padding-top:6px}
+.qcard li.ok span{color:var(--ok);font-weight:600}
+.qcard .exp{font-size:13px;color:var(--muted);font-style:italic}
+.qlist{display:flex;flex-direction:column;gap:8px}
+.chips{display:flex;gap:5px;flex-wrap:wrap}
+.warnlist{margin:0;padding-left:18px;color:var(--warn);font-size:13px}
+.modelrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.modelrow b{min-width:90px}
+.tabs{margin-bottom:2px}
+fieldset{border:0;padding:0;margin:0;min-width:0}
+.busy{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:g 1s linear infinite;vertical-align:-2px}
+@keyframes g{to{transform:rotate(360deg)}}
+sub,sup{font-size:.72em;line-height:0}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><a href="./" class="row" style="gap:10px"><span class="mark" aria-hidden="true"></span><h1>Generador de tests</h1></a></div>
+    <div class="proj">
+      <a class="btn sm ghost" href="corrector.html">Corrector</a>
+      <button id="btn-nuevo" class="btn sm ghost">Empezar de nuevo</button>
+    </div>
+  </header>
+
+  <!-- 1. Preguntas -->
+  <section class="panel">
+    <h2>1 · Preguntas</h2>
+    <div class="card">
+      <div class="tabs" role="tablist">
+        <button class="tab" data-tab="t-excel" aria-pressed="true">Subir Excel</button>
+        <button class="tab" data-tab="t-importar" aria-pressed="false">Importar examen hecho</button>
+        <button class="tab" data-tab="t-ia" aria-pressed="false">Generar con IA</button>
+      </div>
+
+      <div id="t-excel" class="tabp" style="display:flex;flex-direction:column;gap:12px">
+        <p class="hint">Excel con una fila por pregunta (hoja «Preguntas») y los datos de la cabecera (hoja «Examen»). También vale la plantilla de clave del Corrector con enunciados y opciones.</p>
+        <div class="row">
+          <label class="btn primary" for="f-excel">Subir Excel</label><input id="f-excel" type="file" accept=".xlsx,.xls,.csv" hidden>
+          <a class="btn ghost" href="plantillas/plantilla-test.xlsx" download>Plantilla vacía</a>
+          <a class="btn ghost" href="plantillas/ejemplo-q2b-t1-carbono.xlsx" download>Ejemplo (Química 2º Bach)</a>
+        </div>
+      </div>
+
+      <div id="t-importar" class="tabp" hidden style="display:flex;flex-direction:column;gap:12px">
+        <p class="hint">Sube un examen tipo test ya hecho en Word (.docx), PDF o texto. Se leen las preguntas numeradas (1., 2.…) y las opciones (a), b)… o A), B)…). La respuesta correcta se reconoce si está en color, resaltada o en negrita, marcada con * o ✓, con una línea «Respuesta: B» o con una clave al final («Soluciones: 1-B 2-C…»). Revisa siempre el resultado.</p>
+        <div class="row">
+          <label class="btn primary" for="f-imp">Subir examen</label><input id="f-imp" type="file" accept=".docx,.pdf,.txt" hidden>
+          <span id="imp-msg" class="hint"></span>
+        </div>
+      </div>
+
+      <div id="t-ia" class="tabp" hidden style="display:flex;flex-direction:column;gap:12px">
+        <p class="hint">Sube tus apuntes y elige cómo quieres el test. Las preguntas se redactan con la API de Claude (se paga por uso) y siempre hay que revisarlas antes de imprimir.</p>
+        <div class="row">
+          <label class="btn" for="f-apuntes">Subir apuntes (PDF, Word o texto)</label><input id="f-apuntes" type="file" accept=".pdf,.docx,.txt,.md" multiple hidden>
+          <span id="ap-msg" class="hint"></span>
+        </div>
+        <label class="f">O pega aquí el contenido<textarea id="ia-texto" rows="5" placeholder="Pega el texto de los apuntes…"></textarea></label>
+        <div class="grid">
+          <label class="f">Materia<input id="ia-materia" type="text" placeholder="Química"></label>
+          <label class="f">Curso<input id="ia-curso" type="text" placeholder="2º Bachillerato"></label>
+          <label class="f">Número de preguntas<input id="ia-n" type="number" min="1" max="60" value="20" inputmode="numeric"></label>
+          <label class="f">Opciones por pregunta<select id="ia-nopt"><option>3</option><option selected>4</option><option>5</option></select></label>
+          <label class="f">Nivel<select id="ia-nivel"><option value="mixto">Mixto (básico, medio y avanzado)</option><option value="básico">Básico</option><option value="medio">Medio</option><option value="avanzado">Avanzado</option></select></label>
+          <label class="f">Contraseña<input id="ia-clave" type="password" autocomplete="current-password"></label>
+        </div>
+        <label class="f">Indicaciones (opcional)<textarea id="ia-ind" rows="3" placeholder="Por ejemplo: incluye 4 preguntas de cálculo, evita la nomenclatura, que no haya «todas las anteriores»…"></textarea></label>
+        <div class="row"><button id="ia-go" class="btn primary">Generar preguntas</button><span id="ia-msg" class="hint"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Datos -->
+  <section class="panel">
+    <h2>2 · Cabecera y montaje</h2>
+    <div class="card">
+      <div class="grid">
+        <label class="f">Área<input id="c-area" type="text" placeholder="Química"></label>
+        <label class="f">Contenido<input id="c-contenido" type="text" placeholder="1 – Química del carbono"></label>
+        <label class="f">Curso<input id="c-curso" type="text" placeholder="2ºBach B"></label>
+        <label class="f">Modelos<input id="c-modelos" type="text" placeholder="A, B"></label>
+        <label class="f">Nota máxima<input id="c-nota" type="number" min="1" step="any" inputmode="decimal"></label>
+        <label class="f">Fallos
+          <select id="c-fallos"><option value="no">No restan</option><option value="auto">Restan 1/(opciones−1)</option><option value="custom">Restan una fracción</option></select></label>
+        <label class="f" id="c-penwrap" hidden>Fracción que resta<input id="c-pen" type="number" min="0" max="1" step="any" inputmode="decimal" value="0.25"></label>
+        <label class="f">Nº de preguntas del banco<input id="c-num" type="number" min="0" placeholder="todas" inputmode="numeric"></label>
+        <label class="f">Semilla<input id="c-semilla" type="number" min="1" inputmode="numeric"></label>
+      </div>
+      <div class="row" style="gap:18px">
+        <label class="row" style="gap:6px;font-size:13px;font-weight:600"><input id="c-bp" type="checkbox" style="width:auto;min-height:0"> Barajar preguntas en B, C…</label>
+        <label class="row" style="gap:6px;font-size:13px;font-weight:600"><input id="c-bo" type="checkbox" style="width:auto;min-height:0"> Barajar opciones en B, C…</label>
+        <label class="row" style="gap:6px;font-size:13px;font-weight:600"><input id="c-hoja" type="checkbox" style="width:auto;min-height:0"> Tabla de respuestas al final del examen</label>
+      </div>
+      <label class="f">Observaciones (vacío = se escriben solas)<input id="c-obs" type="text"></label>
+      <p class="hint" id="c-obs-auto"></p>
+    </div>
+  </section>
+
+  <!-- 3. Revisión -->
+  <section class="panel">
+    <div class="row between"><h2>3 · Revisión</h2><span id="q-count" class="chip">0 preguntas</span></div>
+    <div id="avisos"></div>
+    <p class="hint">Pulsa una letra para cambiar la respuesta correcta. Para corregir textos, descarga el Excel, edítalo y vuelve a subirlo.</p>
+    <div id="qlist" class="qlist"><p class="empty">Todavía no hay preguntas.</p></div>
+  </section>
+
+  <!-- 4. Descargas -->
+  <section class="panel">
+    <h2>4 · Descargar</h2>
+    <div class="card">
+      <div class="row">
+        <button id="d-zip" class="btn primary">Todo en un .zip</button>
+        <button id="d-excel" class="btn">Excel de preguntas</button>
+        <span id="d-msg" class="hint"></span>
+      </div>
+      <div id="d-modelos"></div>
+      <p class="hint">«Al Corrector» abre ese modelo en el Corrector con su clave, enunciados y penalización; luego solo tienes que añadir los alumnos e imprimir las hojas de respuestas.</p>
+    </div>
+  </section>
+</div>
+
+<div id="dlg" class="dlg" hidden role="alertdialog" aria-modal="true"><div class="box"><p id="dlg-text"></p><div class="row" style="justify-content:flex-end"><button id="dlg-no" class="btn ghost">Cancelar</button><button id="dlg-ok" class="btn primary">Aceptar</button></div></div></div>
+<div id="toast" class="toast" hidden role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="js/test-core.js"></script>
+<script src="js/crear.js"></script>
+</body>
+</html>

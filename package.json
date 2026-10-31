@@ -1,0 +1,9 @@
+{
+  "name": "mariancr-test",
+  "private": true,
+  "type": "module",
+  "description": "Generador y corrector de exámenes tipo test",
+  "dependencies": {
+    "@anthropic-ai/sdk": "1.3.0"
+  }
+}

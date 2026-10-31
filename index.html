@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Exámenes tipo test</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600&family=Schibsted+Grotesk:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="css/estilos.css">
+<style>
+.home{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.home a.card{text-decoration:none;color:inherit;gap:8px}
+.home a.card:hover{border-color:var(--accent)}
+.home h3{font-size:18px}
+.home ol{margin:4px 0 0;padding-left:18px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:3px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top"><div class="brand"><span class="mark" aria-hidden="true"></span><h1>Exámenes tipo test</h1></div></header>
+  <p class="lead">Crea el test en la plantilla del colegio y corrígelo con las hojas de respuestas. Todo funciona en este dispositivo: los datos del alumnado no salen de él.</p>
+  <div class="home">
+    <a class="card" href="crear.html">
+      <h3>Crear examen</h3>
+      <p class="hint">Desde un Excel, desde un examen hecho (Word o PDF) o generando las preguntas a partir de tus apuntes.</p>
+      <ol><li>Carga o genera las preguntas</li><li>Revisa las respuestas correctas</li><li>Descarga el Word por modelo, el corregido y la clave</li></ol>
+    </a>
+    <a class="card" href="corrector.html">
+      <h3>Corregir</h3>
+      <p class="hint">Hojas de respuestas con QR para cada alumno, escaneo con la cámara o en PDF, notas para iDoceo e informes.</p>
+      <ol><li>Alumnos</li><li>Clave (o «Al Corrector» desde Crear examen)</li><li>Imprime, escanea y exporta las notas</li></ol>
+    </a>
+  </div>
+</div>
+</body>
+</html>
