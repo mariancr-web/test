@@ -220,23 +220,33 @@ const OMR = (() => {
     for (let r = 0; r < n; r++) for (let c = 0; c < n; c++)
       if (qr.isDark(r, c)) doc.rect(QR_BOX.x + c * cs, QR_BOX.y + r * cs, cs + 0.02, cs + 0.02, 'F');
 
-    doc.setTextColor(20);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(14);
-    const tl = doc.splitTextToSize(String(title || 'Examen'), 124).slice(0, 2);
-    doc.text(tl, 26, 26);
-    const ty = 26 + tl.length * 6;
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(7); doc.setTextColor(110);
-    doc.text('ALUMNO/A', 26, ty + 4);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(15); doc.setTextColor(20);
-    const nl = doc.splitTextToSize(String(name || ''), 124).slice(0, 1);
-    doc.text(nl, 26, ty + 11);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(10); doc.setTextColor(60);
-    const meta = [group, date].filter(Boolean).join('   ·   ');
-    if (meta) doc.text(meta, 26, ty + 18);
-    if (pages > 1) {
-      doc.setFontSize(9);
-      doc.text(`Hoja ${page + 1} de ${pages}  ·  preguntas ${L.first + 1} a ${L.first + L.count}`, 26, ty + 24);
+    // cabecera del colegio (como la plantilla de examen): logo | datos | nota, curso y fecha.
+    // Queda entre x = 24 y 149 mm para no tocar la marca de esquina ni el QR.
+    const X0 = 24, X1 = 48, X2 = 121, X3 = 149, Y0 = 19, RH = 10.5, Y4 = Y0 + 4 * RH;
+    doc.setDrawColor(0); doc.setLineWidth(0.3);
+    doc.rect(X0, Y0, X3 - X0, Y4 - Y0, 'S');
+    doc.line(X1, Y0, X1, Y4); doc.line(X2, Y0, X2, Y4);
+    doc.line(X1, Y0 + RH, X2, Y0 + RH); doc.line(X1, Y0 + 2 * RH, X3, Y0 + 2 * RH); doc.line(X1, Y0 + 3 * RH, X3, Y0 + 3 * RH);
+    if (info.logo && info.logo.data) {
+      const mw = X1 - X0 - 2, mh = Y4 - Y0 - 4, k = Math.min(mw / info.logo.w, mh / info.logo.h);
+      const w = info.logo.w * k, h = info.logo.h * k;
+      doc.addImage(info.logo.data, 'JPEG', X0 + (X1 - X0 - w) / 2, Y0 + (Y4 - Y0 - h) / 2, w, h, 'logo-colegio');
     }
+    const cel = (txt, x, y, w, size, bold, color, max) => {
+      doc.setFont('helvetica', bold ? 'bold' : 'normal'); doc.setFontSize(size); doc.setTextColor(color == null ? 20 : color);
+      const ls = doc.splitTextToSize(String(txt || ''), w).slice(0, max || 1);
+      doc.text(ls, x, y); return ls.length;
+    };
+    cel('Escuelas Salesianas Mª Auxiliadora Nervión', X1 + 2, Y0 + 6.4, X2 - X1 - 3, 8, true);
+    cel('Alumno/a:', X1 + 2, Y0 + RH + 4, 30, 7.5, false, 80);
+    cel(name, X1 + 2, Y0 + RH + 8.6, X2 - X1 - 4, String(name || '').length > 34 ? 9 : 11, true);
+    cel('Área y grupo: ' + (group || ''), X1 + 2, Y0 + 2 * RH + 4.2, X2 - X1 - 4, 8, false);
+    cel('Contenido: ' + (title || ''), X1 + 2, Y0 + 2 * RH + 8.3, X2 - X1 - 4, 8, false);
+    cel('Observaciones:', X1 + 2, Y0 + 3 * RH + 4.2, 30, 8, false);
+    if (pages > 1) cel(`Hoja ${page + 1} de ${pages} · preguntas ${L.first + 1} a ${L.first + L.count}`, X1 + 2, Y0 + 3 * RH + 8.3, X2 - X1 - 4, 8, true);
+    cel('NOTA:', X2 + 2, Y0 + 5, X3 - X2 - 4, 9, true);
+    cel('nº: ' + (idx || ''), X2 + 2, Y0 + 2 * RH + 6.5, X3 - X2 - 4, 9, false);
+    cel('Fecha: ' + (date || ''), X2 + 2, Y0 + 3 * RH + 6.5, X3 - X2 - 4, 8, false);
 
     // instrucciones
     const bx = 26, by = 64, bw = 124, bh = 40;
@@ -1101,13 +1111,24 @@ function canvasDoc(cv, sc) {
     circle(x, y, r, st) { ctx.beginPath(); ctx.arc(x * sc, y * sc, r * sc, 0, 7); if (st.includes('F')) { ctx.fillStyle = fill; ctx.fill(); } if (st.includes('S') || st.includes('D')) { ctx.strokeStyle = draw; ctx.lineWidth = Math.max(1, lw * sc); ctx.stroke(); } },
     line(a, b, c, e) { ctx.beginPath(); ctx.moveTo(a * sc, b * sc); ctx.lineTo(c * sc, e * sc); ctx.strokeStyle = draw; ctx.lineWidth = Math.max(1, lw * sc); ctx.stroke(); },
     text(s, x, y, o) { font(); ctx.fillStyle = tc; ctx.textAlign = (o && o.align) || 'left'; (Array.isArray(s) ? s : [s]).forEach((ln, i) => ctx.fillText(ln, x * sc, (y + i * fs * 0.3528 * 1.2) * sc)); },
+    addImage(data, f, x, y, w, h) { const im = LOGO.img; if (im && im.complete && im.naturalWidth) ctx.drawImage(im, x * sc, y * sc, w * sc, h * sc); },
     splitTextToSize(s, w) { font(); const out = []; let cur = ''; String(s).split(' ').forEach(wd => { const t = cur ? cur + ' ' + wd : wd; if (ctx.measureText(t).width > w * sc && cur) { out.push(cur); cur = wd; } else cur = t; }); if (cur) out.push(cur); return out; }
   };
   return d;
 }
+/* logo del colegio para la cabecera de las hojas */
+const LOGO = { data: null, w: 1, h: 1, img: null };
+(async () => {
+  try {
+    const r = await fetch('plantillas/logo-colegio.jpg'); if (!r.ok) return;
+    const b = await r.blob();
+    LOGO.data = await new Promise(res => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); });
+    const im = new Image(); im.onload = () => { LOGO.w = im.naturalWidth; LOGO.h = im.naturalHeight; LOGO.img = im; if (step === 'p3') renderSheetPanel(); }; im.src = LOGO.data;
+  } catch (e) { /* sin logo */ }
+})();
 function sheetInfo(name, idx, page) {
   const E = S.exam;
-  return { title: E.title || 'Examen', group: E.group, date: fmtDate(E.date), name, idx, page, pages: OMR.pagesFor(E.nq), nq: E.nq, nopt: E.nopt, code: E.code };
+  return { logo: LOGO.img ? LOGO : null, title: E.title || 'Examen', group: E.group, date: fmtDate(E.date), name, idx, page, pages: OMR.pagesFor(E.nq), nq: E.nq, nopt: E.nopt, code: E.code };
 }
 function renderSheetPanel() {
   const st = students(), E = S.exam, pages = OMR.pagesFor(E.nq);
