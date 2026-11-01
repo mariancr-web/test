@@ -13,6 +13,7 @@ let S = nuevo();
 try { const o = JSON.parse(localStorage.getItem(SKEY) || 'null'); if (o && o.cfg && Array.isArray(o.preguntas)) S = o; } catch (e) { /* sin almacenamiento */ }
 let saveT = 0;
 const persist = () => { clearTimeout(saveT); saveT = setTimeout(() => { try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { /* ignorar */ } }, 250); };
+addEventListener('pagehide', () => { clearTimeout(saveT); try { localStorage.setItem(SKEY, JSON.stringify(S)); } catch (e) { /* ignorar */ } });
 
 /* ---------- avisos ---------- */
 let toastT = 0;
@@ -64,12 +65,55 @@ async function textoDe(file) {
   return readText(file);
 }
 
+/* ---------- recorridos y pasos ---------- */
+const RECORRIDOS = {
+  plantilla: [['datos', 'Datos'], ['contenido-plantilla', 'Contenido'], ['lista', 'Preguntas'], ['revision', 'Revisión'], ['descarga', 'Descarga']],
+  ia: [['datos', 'Datos'], ['contenido-ia', 'Contenido'], ['config-ia', 'Preguntas'], ['ia', 'Datos de IA'], ['revision', 'Revisión'], ['descarga', 'Descarga']],
+};
+if (!S.modo) S.modo = ''; if (!S.paso) S.paso = 0;
+const pasos = () => RECORRIDOS[S.modo] || [];
+function irA(i) {
+  const P = pasos(); if (!P.length) return;
+  S.paso = Math.max(0, Math.min(P.length - 1, i)); persist();
+  const id = P[S.paso][0];
+  // en «Generar», la revisión incluye la lista de preguntas; en «Plantilla», nota/modelos/fallos van en Revisión
+  $$('.paso').forEach(p => { p.hidden = !(p.dataset.paso === id || (S.modo === 'ia' && id === 'revision' && p.dataset.paso === 'lista')); });
+  const lp = $('[data-paso="lista"]'), rv = $('[data-paso="revision"]');
+  if (S.modo === 'ia') rv.after(lp); else rv.before(lp);
+  const mb = $('#montaje-base');
+  if (S.modo === 'ia') $('#montaje-ia').appendChild(mb); else $('#montaje-rev').prepend(mb);
+  $('#lista-titulo').textContent = S.modo === 'ia' ? 'Preguntas generadas' : 'Preguntas';
+  $('#leido').hidden = S.modo !== 'plantilla';
+  $('#steps').innerHTML = P.map(([, t], k) => `<button class="step" data-i="${k}" aria-current="${k === S.paso}"><span class="n">${k + 1}</span><span class="t">${t}</span></button>`).join('');
+  $('#steps').style.setProperty('--n', P.length);
+  $('#p-ant').hidden = S.paso === 0;
+  $('#p-sig').hidden = S.paso === P.length - 1;
+  $('#p-sig').textContent = id === 'ia' ? 'Saltar a Revisión →' : 'Siguiente →';
+  if (id === 'revision') pintarResumen();
+}
+function elegirModo(m) {
+  S.modo = m; S.paso = 0;
+  $$('.modo').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.modo === m)));
+  $('#steps').hidden = $('#navp').hidden = !m;
+  irA(0);
+}
+$$('.modo').forEach(b => b.addEventListener('click', () => { elegirModo(b.dataset.modo); $('#steps').scrollIntoView({ behavior: 'smooth', block: 'start' }); }));
+$('#steps').addEventListener('click', e => { const b = e.target.closest('[data-i]'); if (b) irA(+b.dataset.i); });
+$('#p-ant').addEventListener('click', () => { irA(S.paso - 1); $('#steps').scrollIntoView({ block: 'start' }); });
+$('#p-sig').addEventListener('click', () => {
+  const id = pasos()[S.paso][0];
+  if (id === 'contenido-plantilla' && !S.preguntas.length) toast('Todavía no hay preguntas cargadas.', true);
+  if (id === 'ia' && !S.preguntas.length) { toast('Primero pulsa «Generar preguntas».', true); return; }
+  irA(S.paso + 1); $('#steps').scrollIntoView({ block: 'start' });
+});
+
 /* ---------- formulario de configuración ---------- */
+const letrasModelos = n => LET.slice(0, Math.max(1, Math.min(8, n))).split('');
 function pintarCfg() {
   const c = S.cfg;
   $('#c-area').value = c.area || ''; $('#c-contenido').value = c.contenido || ''; $('#c-curso').value = c.curso || '';
   if (window.cursoMarca) cursoMarca(c.curso);
-  $('#c-modelos').value = (c.modelos || []).join(', '); $('#c-nota').value = c.nota; $('#c-semilla').value = c.semilla;
+  $('#c-nmod').value = (c.modelos || ['A']).length; $('#c-nota').value = c.nota; $('#c-semilla').value = c.semilla;
   $('#c-num').value = c.numPreguntas || ''; $('#c-obs').value = c.observaciones || '';
   $('#c-bp').checked = !!c.barajarPreguntas; $('#c-bo').checked = !!c.barajarOpciones; $('#c-hoja').checked = !!c.hojaRespuestas;
   $('#c-fallos').value = c.fallos === 'auto' ? 'auto' : typeof c.fallos === 'number' ? 'custom' : 'no';
@@ -80,7 +124,7 @@ function pintarCfg() {
 function leerCfg() {
   const c = S.cfg;
   c.area = $('#c-area').value.trim(); c.contenido = $('#c-contenido').value.trim(); c.curso = $('#c-curso').value.trim();
-  const m = $('#c-modelos').value.toUpperCase().split(/[^A-Z0-9]+/).filter(Boolean); c.modelos = m.length ? m.slice(0, 8) : ['A'];
+  c.modelos = letrasModelos(parseInt($('#c-nmod').value, 10) || 1);
   const n = parseFloat($('#c-nota').value); c.nota = n > 0 ? n : 10;
   const s = parseInt($('#c-semilla').value, 10); c.semilla = s > 0 ? s : 1;
   const k = parseInt($('#c-num').value, 10); c.numPreguntas = k > 0 ? k : 0;
@@ -88,51 +132,126 @@ function leerCfg() {
   c.barajarPreguntas = $('#c-bp').checked; c.barajarOpciones = $('#c-bo').checked; c.hojaRespuestas = $('#c-hoja').checked;
   const f = $('#c-fallos').value; $('#c-penwrap').hidden = f !== 'custom';
   c.fallos = f === 'auto' ? 'auto' : f === 'custom' ? (parseFloat($('#c-pen').value) || 0.25) : 'no';
-  obsAuto(); persist(); pintarDescargas();
+  obsAuto(); persist(); pintarDescargas(); pintarResumen();
 }
 function obsAuto() {
   const n = S.cfg.numPreguntas && S.cfg.numPreguntas < S.preguntas.length ? S.cfg.numPreguntas : S.preguntas.length;
   $('#c-obs-auto').textContent = n && !S.cfg.observaciones ? 'Saldrá: «' + TC.textoObservaciones(S.cfg, n, TC.nOpciones(S.preguntas)) + '»' : '';
 }
-$$('#c-area,#c-contenido,#c-curso,#c-modelos,#c-nota,#c-semilla,#c-num,#c-obs,#c-pen').forEach(el => el.addEventListener('input', guard(leerCfg)));
+$$('#c-area,#c-contenido,#c-curso,#c-nmod,#c-nota,#c-semilla,#c-num,#c-obs,#c-pen').forEach(el => el.addEventListener('input', guard(leerCfg)));
 $$('#c-bp,#c-bo,#c-hoja,#c-fallos').forEach(el => el.addEventListener('change', guard(leerCfg)));
+
+/* ---------- lo que se ha leído y resumen ---------- */
+const lista = ns => ns.length > 12 ? ns.slice(0, 12).join(', ') + '…' : ns.join(', ');
+function pintarLeido() {
+  const P = S.preguntas, box = $('#leido');
+  if (!P.length) { box.innerHTML = '<p class="hint">Todavía no se ha cargado nada. Vuelve a «Contenido».</p>'; return; }
+  const porN = {}; P.forEach(q => { porN[q.opciones.length] = (porN[q.opciones.length] || 0) + 1; });
+  const sin = [], varias = [], fuera = [];
+  P.forEach((q, i) => {
+    if (!q.correcta) sin.push(i + 1);
+    else if (q.correcta.length > 1) varias.push(i + 1);
+    if ([...(q.correcta || '')].some(L => LET.indexOf(L) >= q.opciones.length)) fuera.push(i + 1);
+  });
+  const reparto = {}; P.forEach(q => [...(q.correcta || '')].forEach(L => { reparto[L] = (reparto[L] || 0) + 1; }));
+  const li = (ok, t) => `<li style="color:var(${ok ? '--ink' : '--warn'})">${ok ? '✓' : '⚠'} ${t}</li>`;
+  box.innerHTML = `<h3>Lo que se ha leído${S.origen ? (S.origen.startsWith('el ') ? ' del ' + esc(S.origen.slice(3)) : ' de ' + esc(S.origen)) : ''}</h3><ul class="pasos-ia" style="list-style:none;padding-left:0">
+    ${li(true, `<b>${P.length}</b> preguntas`)}
+    ${li(Object.keys(porN).length === 1, 'Opciones por pregunta: ' + Object.entries(porN).map(([n, k]) => `${n} opciones (${k})`).join(' · '))}
+    ${li(!sin.length, sin.length ? `<b>${sin.length}</b> sin respuesta correcta: nº ${lista(sin)}` : 'Todas tienen respuesta correcta')}
+    ${varias.length ? li(true, `${varias.length} con varias opciones verdaderas: nº ${lista(varias)}`) : ''}
+    ${fuera.length ? li(false, `Respuesta que no existe en: nº ${lista(fuera)}`) : ''}
+    ${li(true, 'Respuestas correctas por letra: ' + Object.keys(reparto).sort().map(L => `${L}: ${reparto[L]}`).join(' · '))}
+  </ul>`;
+}
+function pintarResumen() {
+  const P = S.preguntas, c = S.cfg;
+  const n = c.numPreguntas && c.numPreguntas < P.length ? c.numPreguntas : P.length;
+  const sin = P.filter(q => !q.correcta).length;
+  const fallos = c.fallos === 'auto' ? '1/(opc.−1)' : typeof c.fallos === 'number' ? String(c.fallos).replace('.', ',') : 'No restan';
+  const it = (v, t) => `<div><b>${esc(v)}</b><span>${t}</span></div>`;
+  $('#resumen').innerHTML = it(n, 'preguntas por modelo') + it(c.modelos.join(', '), 'modelos') + it(String(c.nota).replace('.', ','), 'nota máxima')
+    + it(fallos, 'fallos') + it(sin, sin === 1 ? 'pregunta sin respuesta' : 'preguntas sin respuesta');
+}
 
 /* ---------- lista de preguntas ---------- */
 function html(t) { // vista previa: `fórmulas`, ^sup, _sub
   return TC.trozos(t).map(x => x.sub ? `<sub>${esc(x.t)}</sub>` : x.sup ? `<sup>${esc(x.t)}</sup>` : esc(x.t)).join('');
+}
+let editando = -1;
+function tarjeta(q, i) {
+  if (i === editando) {
+    return `<div class="qcard qedit" data-edit="${i}"><div class="qh"><span class="qn">${i + 1}</span><b>Editar pregunta</b></div>
+      <label class="f">Enunciado<textarea rows="2" data-k="pregunta">${esc(q.pregunta)}</textarea></label>
+      ${q.opciones.map((o, j) => `<div class="op"><b>${LET[j]}</b><input type="text" data-o="${j}" value="${esc(o)}"></div>`).join('')}
+      <div class="row"><button class="btn sm ghost" data-opadd="${i}">+ opción</button>${q.opciones.length > 2 ? `<button class="btn sm ghost" data-opdel="${i}">− última opción</button>` : ''}</div>
+      <label class="f">Explicación (sale en el corregido)<input type="text" data-k="explicacion" value="${esc(q.explicacion || '')}"></label>
+      <p class="hint">Fórmulas entre acentos graves: \`H2SO4\`. Superíndices con ^: 10^-3.</p>
+      <div class="row"><button class="btn sm primary" data-guardar="${i}">Guardar</button><button class="btn sm ghost" data-cancelar>Cancelar</button></div></div>`;
+  }
+  const chips = [q.nivel, q.apartado, q.origen].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join('');
+  const ops = q.opciones.map((o, j) => {
+    const L = LET[j], ok = (q.correcta || '').includes(L);
+    return `<li class="${ok ? 'ok' : ''}"><button class="qb" data-q="${i}" data-l="${L}" aria-pressed="${ok}" aria-label="Pregunta ${i + 1}: marcar ${L} como correcta">${L}</button><span>${html(o)}</span></li>`;
+  }).join('');
+  const aviso = !q.correcta ? '<span class="chip warn">sin respuesta</span>' : q.correcta.length > 1 ? `<span class="chip">${q.correcta.length} verdaderas</span>` : '';
+  return `<div class="qcard"><div class="qh"><span class="qn">${i + 1}</span><div class="qt">${html(q.pregunta)}</div><button class="btn sm ghost" data-ed="${i}">Editar</button><button class="btn sm ghost danger" data-del="${i}" aria-label="Quitar pregunta ${i + 1}">Quitar</button></div>${chips || aviso ? `<div class="chips">${aviso}${chips}</div>` : ''}<ol>${ops}</ol>${q.explicacion ? `<p class="exp">${html(q.explicacion)}</p>` : ''}</div>`;
 }
 function pintarPreguntas() {
   const P = S.preguntas;
   $('#q-count').textContent = P.length + (P.length === 1 ? ' pregunta' : ' preguntas');
   const av = TC.validar(P);
   $('#avisos').innerHTML = av.length ? `<div class="warnbox"><b>Revisa:</b><ul class="warnlist">${av.slice(0, 30).map(a => `<li>${esc(a)}</li>`).join('')}</ul></div>` : '';
-  if (!P.length) { $('#qlist').innerHTML = '<p class="empty">Todavía no hay preguntas.</p>'; obsAuto(); pintarDescargas(); return; }
-  $('#qlist').innerHTML = P.map((q, i) => {
-    const chips = [q.nivel, q.apartado, q.origen].filter(Boolean).map(c => `<span class="chip">${esc(c)}</span>`).join('');
-    const ops = q.opciones.map((o, j) => {
-      const L = LET[j], ok = q.correcta.includes(L);
-      return `<li class="${ok ? 'ok' : ''}"><button class="qb" data-q="${i}" data-l="${L}" aria-pressed="${ok}" aria-label="Pregunta ${i + 1}: marcar ${L} como correcta">${L}</button><span>${html(o)}</span></li>`;
-    }).join('');
-    return `<div class="qcard"><div class="qh"><span class="qn">${i + 1}</span><div class="qt">${html(q.pregunta)}</div><button class="btn sm ghost danger" data-del="${i}" aria-label="Quitar pregunta ${i + 1}">Quitar</button></div>${chips ? `<div class="chips">${chips}</div>` : ''}<ol>${ops}</ol>${q.explicacion ? `<p class="exp">${html(q.explicacion)}</p>` : ''}</div>`;
-  }).join('');
-  obsAuto(); pintarDescargas();
+  $('#qlist').innerHTML = P.length ? P.map(tarjeta).join('') : '<p class="empty">Todavía no hay preguntas.</p>';
+  pintarLeido(); obsAuto(); pintarDescargas(); pintarResumen();
+}
+function leerEdicion(i) {
+  const box = $(`[data-edit="${i}"]`), q = S.preguntas[i];
+  q.pregunta = box.querySelector('[data-k="pregunta"]').value.trim();
+  q.explicacion = box.querySelector('[data-k="explicacion"]').value.trim();
+  q.opciones = Array.from(box.querySelectorAll('[data-o]')).map(x => x.value.trim());
 }
 $('#qlist').addEventListener('click', guard(async e => {
-  const b = e.target.closest('[data-l]');
-  if (b) { const q = S.preguntas[+b.dataset.q]; q.correcta = b.dataset.l; persist(); pintarPreguntas(); return; }
-  const d = e.target.closest('[data-del]');
-  if (d && await ask(`¿Quitar la pregunta ${+d.dataset.del + 1}?`, 'Quitar')) { S.preguntas.splice(+d.dataset.del, 1); persist(); pintarPreguntas(); }
+  const t = e.target;
+  const b = t.closest('[data-l]');
+  if (b) { // marcar / desmarcar (varias verdaderas permitidas)
+    const q = S.preguntas[+b.dataset.q], L = b.dataset.l; let c = q.correcta || '';
+    c = c.includes(L) ? c.replace(L, '') : (c + L).split('').sort().join('');
+    q.correcta = c; persist(); pintarPreguntas(); return;
+  }
+  if (t.closest('[data-ed]')) { editando = +t.closest('[data-ed]').dataset.ed; pintarPreguntas(); const ta = $(`[data-edit="${editando}"] textarea`); if (ta) ta.focus(); return; }
+  if (t.closest('[data-cancelar]')) { if (S.preguntas[editando] && !S.preguntas[editando].pregunta && S.preguntas[editando].opciones.every(o => !o)) S.preguntas.splice(editando, 1); editando = -1; persist(); pintarPreguntas(); return; }
+  if (t.closest('[data-opadd]')) { const i = +t.closest('[data-opadd]').dataset.opadd; leerEdicion(i); if (S.preguntas[i].opciones.length < LET.length) S.preguntas[i].opciones.push(''); pintarPreguntas(); return; }
+  if (t.closest('[data-opdel]')) { const i = +t.closest('[data-opdel]').dataset.opdel; leerEdicion(i); const q = S.preguntas[i]; q.opciones.pop(); q.correcta = [...(q.correcta || '')].filter(L => LET.indexOf(L) < q.opciones.length).join(''); pintarPreguntas(); return; }
+  if (t.closest('[data-guardar]')) {
+    const i = +t.closest('[data-guardar]').dataset.guardar; leerEdicion(i);
+    const q = S.preguntas[i]; q.opciones = q.opciones.filter(Boolean);
+    q.correcta = [...(q.correcta || '')].filter(L => LET.indexOf(L) < q.opciones.length).join('');
+    if (!q.pregunta || q.opciones.length < 2) { toast('Hace falta el enunciado y al menos dos opciones.', true); pintarPreguntas(); return; }
+    editando = -1; persist(); pintarPreguntas(); return;
+  }
+  const d = t.closest('[data-del]');
+  if (d && await ask(`¿Quitar la pregunta ${+d.dataset.del + 1}?`, 'Quitar')) { S.preguntas.splice(+d.dataset.del, 1); editando = -1; persist(); pintarPreguntas(); }
 }));
+$('#q-add').addEventListener('click', () => {
+  const n = TC.nOpciones(S.preguntas) || 4;
+  S.preguntas.push({ pregunta: '', opciones: Array(n).fill(''), correcta: '', nivel: '', apartado: '', origen: '', explicacion: '', ordenFijo: false });
+  editando = S.preguntas.length - 1; pintarPreguntas();
+  const ta = $(`[data-edit="${editando}"] textarea`); if (ta) { ta.scrollIntoView({ block: 'center' }); ta.focus(); }
+});
 
-async function cargar(preguntas, cfg, origen) {
+async function cargar(preguntas, cfg, origen, siguiente) {
   if (!preguntas.length) { toast('No he encontrado preguntas con al menos dos opciones en ' + origen + '.', true); return; }
   if (S.preguntas.length && !await ask(`Ya hay ${S.preguntas.length} preguntas. ¿Sustituirlas por las ${preguntas.length} de ${origen}?`, 'Sustituir')) return;
-  S.preguntas = preguntas;
-  if (cfg) S.cfg = cfg;
+  S.preguntas = preguntas; S.origen = origen; editando = -1;
+  if (cfg) { // conserva lo que ya se ha escrito en «Datos»
+    ['area', 'contenido', 'curso'].forEach(k => { if (S.cfg[k] && !cfg[k]) cfg[k] = S.cfg[k]; else if (S.cfg[k]) cfg[k] = S.cfg[k]; });
+    S.cfg = cfg;
+  }
   persist(); pintarCfg(); pintarPreguntas();
   const sin = preguntas.filter(q => !q.correcta).length;
-  toast(`${preguntas.length} preguntas cargadas${sin ? `; ${sin} sin respuesta correcta` : ''}. Revísalas.`, sin > 0);
-  document.querySelector('#qlist').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  toast(`${preguntas.length} preguntas cargadas${sin ? `; ${sin} sin respuesta correcta` : ''}.`, sin > 0);
+  if (siguiente) { irA(S.paso + 1); $('#steps').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 }
 
 /* ---------- pestañas ---------- */
@@ -141,7 +260,14 @@ $$('.tab').forEach(t => t.addEventListener('click', () => {
   $$('.tabp').forEach(p => { p.hidden = p.id !== t.dataset.tab; });
 }));
 
-/* ---------- 1a. Excel ---------- */
+/* ---------- contenido: a mano ---------- */
+$('#mano-go').addEventListener('click', guard(async () => {
+  const t = $('#mano-texto').value;
+  if (!t.trim()) { toast('Escribe o pega primero las preguntas.', true); return; }
+  await cargar(TC.importarTexto(t), Object.assign({}, S.cfg), 'el texto escrito', true);
+}));
+
+/* ---------- contenido: Excel ---------- */
 $('#f-excel').addEventListener('change', guard(async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   const wb = XLSX.read(await f.arrayBuffer(), { type: 'array' });
@@ -150,10 +276,10 @@ $('#f-excel').addEventListener('change', guard(async e => {
   const nP = nombres.find(n => /pregunt|clave/i.test(n)) || nombres.find(n => TC.leerPreguntas(hoja(n)).length) || nombres[0];
   const nE = nombres.find(n => /^examen|config|datos/i.test(n));
   const cfg = nE ? TC.leerConfig(hoja(nE)) : Object.assign({}, S.cfg);
-  await cargar(TC.leerPreguntas(hoja(nP)), cfg, 'el Excel');
+  await cargar(TC.leerPreguntas(hoja(nP)), cfg, '«' + f.name + '»', true);
 }));
 
-/* ---------- 1b. Importar examen hecho ---------- */
+/* ---------- contenido: Word o PDF ---------- */
 $('#f-imp').addEventListener('change', guard(async e => {
   const f = e.target.files[0]; e.target.value = ''; if (!f) return;
   $('#imp-msg').innerHTML = '<span class="busy"></span> Leyendo…';
@@ -161,15 +287,15 @@ $('#f-imp').addEventListener('change', guard(async e => {
     let ps;
     if (ext(f) === 'docx') ps = TC.importarDocx(await docxXml(f));
     else if (ext(f) === 'pdf') ps = TC.importarTexto((await pdfLines(f)).join('\n'));
-    else if (ext(f) === 'xlsx' || ext(f) === 'xls') { toast('Para Excel usa la pestaña «Subir Excel».', true); return; }
+    else if (ext(f) === 'xlsx' || ext(f) === 'xls') { toast('Para Excel usa la pestaña «Desde un Excel».', true); return; }
     else ps = TC.importarTexto(await textoDe(f));
     const cfg = Object.assign({}, S.cfg);
-    if (!cfg.contenido) cfg.contenido = f.name.replace(/\.[^.]+$/, '');
-    await cargar(ps, cfg, 'el examen');
+    if (!cfg.contenido && !$('#c-contenido').value.trim()) cfg.contenido = f.name.replace(/\.[^.]+$/, '');
+    await cargar(ps, cfg, '«' + f.name + '»', true);
   } finally { $('#imp-msg').textContent = ''; }
 }));
 
-/* ---------- 1c. Generar con IA ---------- */
+/* ---------- contenido: apuntes para la IA ---------- */
 let apuntes = [];
 $('#f-apuntes').addEventListener('change', guard(async e => {
   const fs = Array.from(e.target.files); e.target.value = ''; if (!fs.length) return;
@@ -178,27 +304,35 @@ $('#f-apuntes').addEventListener('change', guard(async e => {
     apuntes = [];
     for (const f of fs) apuntes.push({ nombre: f.name, texto: await textoDe(f) });
     const chars = apuntes.reduce((s, a) => s + a.texto.length, 0);
-    $('#ap-msg').textContent = `${apuntes.length} archivo(s), ${Math.round(chars / 1000)} mil caracteres leídos.` + (chars < 500 ? ' Parece que casi no hay texto: si es un PDF escaneado, pega el contenido.' : '');
+    $('#ap-msg').textContent = `${apuntes.map(a => a.nombre).join(', ')}: ${Math.round(chars / 1000)} mil caracteres leídos.` + (chars < 500 ? ' Parece que casi no hay texto: si es un PDF escaneado, pega el contenido.' : '');
   } catch (err) { $('#ap-msg').textContent = ''; throw err; }
 }));
+function ajustarVerdaderas() {
+  const nopt = +$('#ia-nopt').value, sel = $('#ia-nver'), v = Math.min(+sel.value || 1, nopt - 1);
+  sel.innerHTML = Array.from({ length: nopt - 1 }, (_, k) => `<option${k + 1 === v ? ' selected' : ''}>${k + 1}</option>`).join('');
+}
+$('#ia-nopt').addEventListener('change', ajustarVerdaderas); ajustarVerdaderas();
+
+/* ---------- datos de IA y generación ---------- */
 try { $('#ia-clave').value = sessionStorage.getItem('gt-clave') || ''; } catch (e) { /* nada */ }
 try { const k = localStorage.getItem('gt-api') || sessionStorage.getItem('gt-api') || ''; $('#ia-api').value = k; $('#ia-api-rec').checked = !!localStorage.getItem('gt-api'); } catch (e) { /* nada */ }
 $('#ia-api-rec').addEventListener('change', () => { try { if (!$('#ia-api-rec').checked) localStorage.removeItem('gt-api'); } catch (e) { /* nada */ } });
 $('#ia-go').addEventListener('click', guard(async () => {
   const texto = apuntes.map(a => `### ${a.nombre}\n${a.texto}`).join('\n\n') + ($('#ia-texto').value.trim() ? '\n\n' + $('#ia-texto').value.trim() : '');
-  if (texto.trim().length < 200) { toast('Sube los apuntes o pega su contenido (hace falta algo de texto).', true); return; }
+  if (texto.trim().length < 200) { toast('En «Contenido», sube los apuntes o pega su texto.', true); return; }
   if (texto.length > 600000) { toast('Los apuntes son muy largos. Sube solo el tema que entra en el examen.', true); return; }
   const clave = $('#ia-clave').value;
   const apiKey = $('#ia-api').value.trim();
-  if (!clave && !apiKey) { toast('Escribe la contraseña de la web o tu propia clave de API.', true); return; }
+  if (!clave && !apiKey) { toast('Pega tu clave de API o escribe la contraseña de la web.', true); return; }
   if (apiKey && !/^sk-ant-/.test(apiKey)) { toast('La clave de API de Anthropic empieza por «sk-ant-».', true); return; }
   try {
     if (clave) sessionStorage.setItem('gt-clave', clave);
     if (apiKey) { sessionStorage.setItem('gt-api', apiKey); if ($('#ia-api-rec').checked) localStorage.setItem('gt-api', apiKey); else localStorage.removeItem('gt-api'); }
   } catch (e) { /* nada */ }
+  leerCfg();
   const body = {
-    clave, apiKey, apuntes: texto, materia: $('#ia-materia').value.trim() || S.cfg.area, curso: $('#ia-curso').value.trim() || S.cfg.curso,
-    tema: S.cfg.contenido, n: Math.min(60, Math.max(1, parseInt($('#ia-n').value, 10) || 20)), nopt: +$('#ia-nopt').value,
+    clave, apiKey, apuntes: texto, materia: S.cfg.area, curso: S.cfg.curso, tema: S.cfg.contenido,
+    n: Math.min(60, Math.max(1, parseInt($('#ia-n').value, 10) || 20)), nopt: +$('#ia-nopt').value, nver: +$('#ia-nver').value,
     nivel: $('#ia-nivel').value, indicaciones: $('#ia-ind').value.trim()
   };
   const btn = $('#ia-go'); btn.disabled = true;
@@ -207,14 +341,12 @@ $('#ia-go').addEventListener('click', guard(async () => {
     const r = await fetch('api/generar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
     const j = await r.json().catch(() => ({ error: 'Respuesta no válida del servidor (' + r.status + ').' }));
     if (!r.ok || j.error) throw new Error(j.error || ('Error ' + r.status));
-    const cfg = Object.assign({}, S.cfg);
-    if (!cfg.area && body.materia) cfg.area = body.materia;
-    await cargar(j.preguntas.map(q => Object.assign({ nivel: '', apartado: '', origen: 'nueva', explicacion: '', ordenFijo: false }, q)), cfg, 'la IA');
+    await cargar(j.preguntas.map(q => Object.assign({ nivel: '', apartado: '', origen: 'nueva', explicacion: '', ordenFijo: false }, q)), Object.assign({}, S.cfg), 'la IA', true);
     $('#ia-msg').textContent = j.aviso || '';
   } catch (err) { $('#ia-msg').textContent = ''; throw err; } finally { btn.disabled = false; }
 }));
 
-/* ---------- 4. descargas ---------- */
+/* ---------- descargas ---------- */
 let plantilla = null;
 async function plantillaZip() {
   if (!plantilla) { const r = await fetch('plantillas/examen-colegio.docx'); if (!r.ok) throw new Error('No se encuentra la plantilla del colegio.'); plantilla = await r.arrayBuffer(); }
@@ -294,8 +426,11 @@ $('#d-zip').addEventListener('click', guard(async () => {
 
 $('#btn-nuevo').addEventListener('click', guard(async () => {
   if (!await ask('¿Borrar las preguntas y los datos de este examen?', 'Borrar')) return;
-  S = nuevo(); persist(); pintarCfg(); pintarPreguntas();
+  S = nuevo(); apuntes = []; $('#mano-texto').value = ''; $('#ia-texto').value = ''; $('#ap-msg').textContent = ''; editando = -1;
+  persist(); pintarCfg(); pintarPreguntas(); elegirModo('');
+  $$('.paso').forEach(p => { p.hidden = true; }); window.scrollTo({ top: 0, behavior: 'smooth' });
 }));
 
 pintarCfg(); pintarPreguntas();
+if (S.modo) { const p = S.paso; elegirModo(S.modo); irA(p); }
 })();

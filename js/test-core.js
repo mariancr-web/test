@@ -295,17 +295,19 @@
     const lineas = String(texto).split(/\r?\n/).map((l, i) => ({ l: l.replace(/\s+/g, ' ').trim(), m: marcas ? marcas[i] : null })).filter(x => x.l);
     const qs = []; let cur = null, ultima = null, enClave = false; const claveTxt = [];
     const reQ = /^(?:pregunta\s*)?(\d{1,3})\s*[.)\-–:]\s*(.+)$/i, reO = /^\(?([A-Ha-h])\s*[.)\]]\s*(.*)$/;
-    const reR = /^(?:respuesta(?:\s+correcta)?|soluci[oó]n|correcta)\s*[:=\-]?\s*\(?([A-Ha-h])\)?(?:\s|$|[.)])/i;
+    const reR = /^(?:respuestas?(?:\s+correctas?)?|soluci[oó]n|correctas?)\s*[:=\-]?\s*\(?([A-Ha-h](?:\)?\s*(?:,|y|e)\s*\(?[A-Ha-h])*)\)?(?:\s|$|[.)])/i;
     const reClave = /^(clave|soluciones|respuestas correctas|plantilla de respuestas|hoja de soluciones)\b[:\s]*/i;
     const marca = s => { let ok = false; s = s.replace(/^\s*[*✓✔☑]\s*|\s*[*✓✔☑]\s*$/g, () => { ok = true; return ''; }).replace(/\s*\((?:correcta|x|ok)\)\s*$/i, () => { ok = true; return ''; }).replace(/^\[x\]\s*/i, () => { ok = true; return ''; }); return [s.trim(), ok]; };
     for (const { l, m: mk } of lineas) {
       let m;
       if (enClave) { claveTxt.push(l); continue; }
       if (reClave.test(l) && (qs.length >= 2)) { enClave = true; claveTxt.push(l.replace(reClave, '')); continue; }
-      if ((m = l.match(reR)) && cur) { cur.correcta = m[1].toUpperCase(); ultima = null; continue; }
-      if ((m = l.match(reO)) && cur && (m[2] || '').length && (m[1] === m[1].toUpperCase() ? true : true)) {
+      if ((m = l.match(reR)) && cur) { cur.correcta = m[1].toUpperCase().replace(/[^A-H]/g, ''); ultima = null; continue; }
+      const pm = l.match(/^[*✓✔☑]\s*(?=\(?[A-Ha-h]\s*[.)\]])/); // «*c) opción»: marca delante de la letra
+      const lo = pm ? l.slice(pm[0].length) : l;
+      if ((m = lo.match(reO)) && cur && (m[2] || '').length) {
         const L = m[1].toUpperCase(), esperado = LET[cur.opciones.length];
-        if (L === esperado) { const [t, ok] = marca(m[2]); cur.opciones.push(t); if (ok || mk) cur.correcta = (cur.correcta || '') + L; ultima = L; continue; }
+        if (L === esperado) { const [t, ok] = marca(m[2]); cur.opciones.push(t); if (ok || mk || pm) cur.correcta = (cur.correcta || '') + L; ultima = L; continue; }
       }
       if ((m = l.match(reQ)) && (!cur || +m[1] === cur.n + 1 || cur.opciones.length >= 2)) {
         cur = { n: +m[1], pregunta: m[2], opciones: [], correcta: '' }; qs.push(cur); ultima = null; continue;
