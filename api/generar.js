@@ -1,9 +1,9 @@
 // Función de Vercel: redacta preguntas tipo test a partir de los apuntes con la API de Claude.
 // Variables de entorno en Vercel: ANTHROPIC_API_KEY (clave de la API) y CLAVE_WEB (contraseña de la web).
+// También acepta la clave de API propia de quien usa la web (campo apiKey): se usa solo para esa petición y no se guarda.
 import Anthropic from '@anthropic-ai/sdk';
 import { timingSafeEqual } from 'node:crypto';
 
-const client = new Anthropic();
 const LET = 'ABCDEF';
 
 const ESQUEMA = {
@@ -60,11 +60,19 @@ function mismaClave(a, b) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Usa POST.' });
-  if (!process.env.CLAVE_WEB || !process.env.ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'Falta configurar ANTHROPIC_API_KEY y CLAVE_WEB en Vercel (Settings → Environment Variables).' });
-  }
   const b = req.body || {};
-  if (!mismaClave(b.clave, process.env.CLAVE_WEB)) return res.status(401).json({ error: 'Contraseña incorrecta.' });
+  const propia = String(b.apiKey || '').trim();
+  let client;
+  if (propia) {
+    if (!/^sk-ant-[\w-]{20,}$/.test(propia)) return res.status(400).json({ error: 'La clave de API no tiene el formato de Anthropic (sk-ant-…).' });
+    client = new Anthropic({ apiKey: propia });
+  } else {
+    if (!process.env.CLAVE_WEB || !process.env.ANTHROPIC_API_KEY) {
+      return res.status(500).json({ error: 'Esta web no tiene clave de API configurada: escribe tu propia clave de API.' });
+    }
+    if (!mismaClave(b.clave, process.env.CLAVE_WEB)) return res.status(401).json({ error: 'Contraseña incorrecta.' });
+    client = new Anthropic();
+  }
 
   const apuntes = String(b.apuntes || '').slice(0, 600000);
   if (apuntes.trim().length < 200) return res.status(400).json({ error: 'Faltan los apuntes.' });
@@ -111,8 +119,9 @@ export default async function handler(req, res) {
       aviso: `${preguntas.length} preguntas generadas${avisos.length ? ' (revisa: ' + avisos.join('; ') + ')' : ''}. Tokens: ${uso.input_tokens || 0} de entrada y ${uso.output_tokens || 0} de salida.`,
     });
   } catch (e) {
-    if (e instanceof Anthropic.AuthenticationError) return res.status(500).json({ error: 'La clave de la API de Anthropic no es válida.' });
+    if (e instanceof Anthropic.AuthenticationError) return res.status(401).json({ error: propia ? 'Tu clave de API no es válida o está desactivada.' : 'La clave de la API guardada en Vercel no es válida.' });
     if (e instanceof Anthropic.RateLimitError) return res.status(429).json({ error: 'Demasiadas peticiones seguidas. Espera un minuto.' });
+    if (e instanceof Anthropic.PermissionDeniedError || (e && e.status === 400 && /credit|balance/i.test(e.message || ''))) return res.status(402).json({ error: 'La cuenta de esa clave de API no tiene saldo o permiso. Revísalo en console.anthropic.com.' });
     if (e instanceof Anthropic.APIError) return res.status(502).json({ error: 'Error de la API de Claude: ' + e.message });
     if (e instanceof SyntaxError) return res.status(502).json({ error: 'La respuesta no tenía el formato esperado. Vuelve a intentarlo.' });
     return res.status(500).json({ error: 'Error inesperado: ' + (e && e.message ? e.message : e) });
