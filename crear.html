@@ -48,43 +48,45 @@ sub,sup{font-size:.72em;line-height:0}
     <h2>1 · Preguntas</h2>
     <div class="card">
       <div class="tabs" role="tablist">
-        <button class="tab" data-tab="t-excel" aria-pressed="true">Subir Excel</button>
-        <button class="tab" data-tab="t-importar" aria-pressed="false">Importar examen hecho</button>
-        <button class="tab" data-tab="t-ia" aria-pressed="false">Generar con IA</button>
+        <button class="tab" data-tab="t-excel" aria-pressed="true">Desde un Excel</button>
+        <button class="tab" data-tab="t-importar" aria-pressed="false">Desde un examen ya hecho</button>
+        <button class="tab" data-tab="t-ia" aria-pressed="false">Con IA desde tus apuntes</button>
       </div>
 
       <div id="t-excel" class="tabp" style="display:flex;flex-direction:column;gap:12px">
-        <p class="hint">Excel con una fila por pregunta (hoja «Preguntas») y los datos de la cabecera (hoja «Examen»). También vale la plantilla de clave del Corrector con enunciados y opciones.</p>
+        <p class="hint">Si ya tienes las preguntas en un Excel: una fila por pregunta (hoja «Preguntas») y los datos de la cabecera (hoja «Examen»). Descarga la plantilla vacía, rellénala y elígela aquí. También vale la plantilla de clave del Corrector con enunciados y opciones.</p>
         <div class="row">
-          <label class="btn primary" for="f-excel">Subir Excel</label><input id="f-excel" type="file" accept=".xlsx,.xls,.csv" hidden>
-          <a class="btn ghost" href="plantillas/plantilla-test.xlsx" download>Plantilla vacía</a>
+          <label class="btn primary" for="f-excel">Elegir mi Excel…</label><input id="f-excel" type="file" accept=".xlsx,.xls,.csv" hidden>
+          <a class="btn ghost" href="plantillas/plantilla-test.xlsx" download>Descargar plantilla vacía</a>
         </div>
       </div>
 
       <div id="t-importar" class="tabp" hidden style="display:flex;flex-direction:column;gap:12px">
         <p class="hint">Sube un examen tipo test ya hecho en Word (.docx), PDF o texto. Se leen las preguntas numeradas (1., 2.…) y las opciones (a), b)… o A), B)…). La respuesta correcta se reconoce si está en color, resaltada o en negrita, marcada con * o ✓, con una línea «Respuesta: B» o con una clave al final («Soluciones: 1-B 2-C…»). Revisa siempre el resultado.</p>
         <div class="row">
-          <label class="btn primary" for="f-imp">Subir examen</label><input id="f-imp" type="file" accept=".docx,.pdf,.txt" hidden>
+          <label class="btn primary" for="f-imp">Elegir el examen (Word o PDF)…</label><input id="f-imp" type="file" accept=".docx,.pdf,.txt" hidden>
           <span id="imp-msg" class="hint"></span>
         </div>
       </div>
 
       <div id="t-ia" class="tabp" hidden style="display:flex;flex-direction:column;gap:12px">
-        <p class="hint">Sube tus apuntes y elige cómo quieres el test. Las preguntas se redactan con la API de Claude (se paga por uso) y siempre hay que revisarlas antes de imprimir.</p>
+        <p class="hint">Sube tus apuntes y elige cómo quieres el test. Las preguntas las redacta Claude a través de su <b>API</b> (servicio de pago por uso de Anthropic, distinto de la suscripción de claude.ai). Hace falta <b>una de dos</b>: la <b>contraseña de la web</b> (usa la clave de API guardada en Vercel) o <b>tu propia clave de API</b> (se crea en <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> y se paga desde esa cuenta). Revisa siempre las preguntas antes de imprimir.</p>
         <div class="row">
           <label class="btn" for="f-apuntes">Subir apuntes (PDF, Word o texto)</label><input id="f-apuntes" type="file" accept=".pdf,.docx,.txt,.md" multiple hidden>
           <span id="ap-msg" class="hint"></span>
         </div>
         <label class="f">O pega aquí el contenido<textarea id="ia-texto" rows="5" placeholder="Pega el texto de los apuntes…"></textarea></label>
         <div class="grid">
-          <label class="f">Materia<input id="ia-materia" type="text" placeholder="Química"></label>
-          <label class="f">Curso<input id="ia-curso" type="text" placeholder="2º Bachillerato"></label>
+          <label class="f">Materia<input id="ia-materia" type="text"></label>
+          <label class="f">Curso<input id="ia-curso" type="text"></label>
           <label class="f">Número de preguntas<input id="ia-n" type="number" min="1" max="60" value="20" inputmode="numeric"></label>
           <label class="f">Opciones por pregunta<select id="ia-nopt"><option>3</option><option selected>4</option><option>5</option></select></label>
           <label class="f">Nivel<select id="ia-nivel"><option value="mixto">Mixto (básico, medio y avanzado)</option><option value="básico">Básico</option><option value="medio">Medio</option><option value="avanzado">Avanzado</option></select></label>
-          <label class="f">Contraseña<input id="ia-clave" type="password" autocomplete="current-password"></label>
+          <label class="f">Contraseña de la web<input id="ia-clave" type="password" autocomplete="current-password"></label>
+          <label class="f">O tu clave de API<input id="ia-api" type="password" autocomplete="off" placeholder="sk-ant-…" spellcheck="false"></label>
         </div>
         <label class="f">Indicaciones (opcional)<textarea id="ia-ind" rows="3" placeholder="Por ejemplo: incluye 4 preguntas de cálculo, evita la nomenclatura, que no haya «todas las anteriores»…"></textarea></label>
+        <label class="row" style="gap:6px;font-size:14px"><input id="ia-api-rec" type="checkbox"> Recordar mi clave de API en este navegador (no la uses en ordenadores compartidos)</label>
         <div class="row"><button id="ia-go" class="btn primary">Generar preguntas</button><span id="ia-msg" class="hint"></span></div>
       </div>
     </div>
@@ -95,10 +97,10 @@ sub,sup{font-size:.72em;line-height:0}
     <h2>2 · Cabecera y montaje</h2>
     <div class="card">
       <div class="grid">
-        <label class="f">Área<input id="c-area" type="text" placeholder="Química"></label>
-        <label class="f">Contenido<input id="c-contenido" type="text" placeholder="1 – Química del carbono"></label>
-        <label class="f">Curso<input id="c-curso" data-curso type="text" placeholder="2ºBach B"></label>
-        <label class="f">Modelos<input id="c-modelos" type="text" placeholder="A, B"></label>
+        <label class="f">Área<input id="c-area" type="text"></label>
+        <label class="f">Contenido<input id="c-contenido" type="text"></label>
+        <label class="f">Curso<input id="c-curso" data-curso type="text"></label>
+        <label class="f">Modelos<input id="c-modelos" type="text"></label>
         <label class="f">Nota máxima<input id="c-nota" type="number" min="1" step="any" inputmode="decimal"></label>
         <label class="f">Fallos
           <select id="c-fallos"><option value="no">No restan</option><option value="auto">Restan 1/(opciones−1)</option><option value="custom">Restan una fracción</option></select></label>
