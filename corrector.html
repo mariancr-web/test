@@ -62,8 +62,10 @@
         <label class="f">Fallos
           <select id="ex-pen"><option value="none">No restan</option><option value="auto">Restan 1/(opciones−1)</option><option value="custom">Restan una fracción</option></select></label>
         <label class="f" id="pen-custom-wrap" hidden>Fracción de punto que resta<input id="ex-penval" type="number" min="0" max="1" step="any" inputmode="decimal"></label>
+        <label class="f">Preguntas con varias verdaderas
+          <select id="ex-multi"><option value="una">Basta con marcar una de ellas</option><option value="todas">Hay que marcarlas todas</option><option value="parcial">Parte proporcional</option></select></label>
       </div>
-      <p class="hint">Las preguntas en blanco y las de doble marca no restan. Si el examen pasa de 100 preguntas, cada alumno recibe varias hojas.</p>
+      <p class="hint">Las preguntas en blanco no restan, y en las de una sola respuesta la doble marca tampoco. En las de varias verdaderas, marcar una opción falsa cuenta como fallo; si faltan verdaderas, según lo elegido arriba cuenta como acierto, no puntúa o puntúa la parte proporcional. Si el examen pasa de 100 preguntas, cada alumno recibe varias hojas.</p>
     </div>
     <div class="card">
       <div class="row between">
@@ -809,22 +811,25 @@ const LG = (() => {
   /* ---------- notas ---------- */
   function grade(key, ans, o) {
     const pen = o.penMode === 'auto' ? 1 / Math.max(1, o.nopt - 1) : o.penMode === 'custom' ? (+o.penVal || 0) : 0;
-    let c = 0, w = 0, b = 0, pts = 0, max = 0, nokey = 0;
-    const det = [];
+    const modo = o.multiMode || 'una';
+    let c = 0, w = 0, b = 0, inc = 0, pts = 0, max = 0, nokey = 0;
+    const det = [], uniq = t => [...new Set(String(t || '').split(''))].sort().join('');
     for (let q = 0; q < o.nq; q++) {
       const k = key[q] || {};
       if (k.x) { det[q] = 'void'; continue; }
       if (!k.a) { det[q] = 'nokey'; nokey++; continue; }
       const p = +k.p > 0 ? +k.p : 1; max += p;
-      const a = ans[q] || '';
-      const todas = a.length > 1 && k.a.length > 1 && [...a].sort().join('') === [...k.a].sort().join(''); // marcó todas las verdaderas
-      if (todas) { c++; pts += p; det[q] = 'ok'; }
-      else if (!a || a.length > 1) { b++; det[q] = 'blank'; }
-      else if (k.a.includes(a)) { c++; pts += p; det[q] = 'ok'; }
-      else { w++; pts -= p * pen; det[q] = 'bad'; }
+      const a = uniq(ans[q]), ka = uniq(k.a);
+      const ok = () => { c++; pts += p; det[q] = 'ok'; }, bad = () => { w++; pts -= p * pen; det[q] = 'bad'; };
+      if (!a) { b++; det[q] = 'blank'; }
+      else if (ka.length === 1) { if (a.length > 1) { b++; det[q] = 'blank'; } else if (a === ka) ok(); else bad(); }
+      else if ([...a].some(L => !ka.includes(L))) bad(); // varias verdaderas: marcó alguna falsa
+      else if (a === ka || modo === 'una') ok();
+      else if (modo === 'parcial') { inc++; pts += p * a.length / ka.length; det[q] = 'part'; }
+      else { inc++; det[q] = 'inc'; }
     }
     const nota = max ? Math.min(o.scale, Math.max(0, pts / max * o.scale)) : 0;
-    return { c, w, b, nota: Math.round(nota * 100) / 100, total: c + w + b, nokey, det, pts, max };
+    return { c, w, b, inc, nota: Math.round(nota * 100) / 100, total: c + w + b + inc, nokey, det, pts, max };
   }
 
   /* ---------- informe por alumno (jsPDF) ---------- */
@@ -872,8 +877,13 @@ const LG = (() => {
     push(post);
     return out;
   }
-  function richWords(text) { return String(text || '').replace(/`/g, '').split(/\s+/).filter(Boolean).map(trozosPalabra); }
-  function runW(doc, r, size) { doc.setFontSize(r.sub || r.sup ? size * 0.68 : size); const w = doc.getTextWidth(r.t); doc.setFontSize(size); return w; }
+  // símbolos que la fuente corporativa (Fira Sans) no tiene: se escriben con la de reserva
+  const reAlt = /([≡↔])/;
+  let ALT = null;
+  const conAlt = runs => runs.flatMap(r => r.t.split(reAlt).filter(Boolean).map(t => Object.assign({}, r, { t, alt: reAlt.test(t) })));
+  function richWords(text) { return String(text || '').replace(/`/g, '').split(/\s+/).filter(Boolean).map(w => conAlt(trozosPalabra(w))); }
+  function altOn(doc, r) { if (!r.alt || !ALT) return null; const f = doc.getFont(); doc.setFont(ALT, 'normal'); return f; }
+  function runW(doc, r, size) { const f = altOn(doc, r); doc.setFontSize(r.sub || r.sup ? size * 0.68 : size); const w = doc.getTextWidth(r.t); doc.setFontSize(size); if (f) doc.setFont(f.fontName, f.fontStyle); return w; }
   function wordW(doc, wd, size) { return wd.reduce((s, r) => s + runW(doc, r, size), 0); }
   // parte el texto en líneas de como mucho maxW mm
   function richLines(doc, text, maxW, size) {
@@ -892,107 +902,141 @@ const LG = (() => {
     if (align === 'right') x -= runs.reduce((s, r) => s + runW(doc, r, size), 0);
     runs.forEach(r => {
       const k = size / 9;
+      const f = altOn(doc, r);
       doc.setFontSize(r.sub || r.sup ? size * 0.68 : size);
       doc.text(r.t, x, y + (r.sub ? 0.9 * k : r.sup ? -1.25 * k : 0));
       x += doc.getTextWidth(r.t);
+      if (f) doc.setFont(f.fontName, f.fontStyle);
     });
     doc.setFontSize(size);
   }
   const coma = (n, d) => (Math.round(n * 10 ** d) / 10 ** d).toFixed(d).replace('.', ',');
 
-  // o: {student, group, title, date, res, key, ans, nq, font, logo:{data,w,h}, centro}
+  /* Informe con la hoja corporativa del colegio (Hoja corporativa - vertical): lema y logo arriba, dirección y franja abajo.
+     o: {student, group, title, date, res, key, ans, nq, scale, font, alt, corp:{logo, franja}, penTxt, multiTxt} */
   function drawReport(doc, o) {
-    const F = o.font || 'helvetica';
-    const M = 18, RIGHT = 210 - M, GREEN = [34, 150, 84], RED = [205, 64, 60], GRAY = [120, 124, 130], INK = [25, 30, 36], SOFT = [150, 154, 160];
+    const F = o.font || 'helvetica'; ALT = o.alt || null;
+    const AZUL = [52, 144, 176], VERDE = [182, 188, 0], VERDE_T = [112, 118, 0], NARANJA = [238, 113, 42], NARANJA_T = [200, 82, 20];
+    const INK = [33, 41, 48], GRAY = [112, 118, 124], SOFT = [160, 165, 170], LINE = [214, 222, 226], CLARO = [236, 245, 248];
+    const M = 19, RIGHT = 210 - M, BOTTOM = 264;
+    const corp = o.corp || {};
     const nm = splitName(o.student);
     const optT = (q, L) => { const t = o.key[q] && o.key[q].o && o.key[q].o[L]; return t ? `${L}) ${t}` : L; };
-    const runHead = () => {
-      doc.setFont(F, 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY);
-      doc.text(`${o.student}  ·  ${o.title || 'Examen'}`, M, 12);
+    const tramos = (y, parts, size) => { // línea centrada con varios colores
+      doc.setFontSize(size); const tw = parts.reduce((s, [t]) => s + doc.getTextWidth(t), 0); let x = 105 - tw / 2;
+      parts.forEach(([t, col]) => { doc.setTextColor(...col); doc.text(t, x, y); x += doc.getTextWidth(t); });
     };
-    // cabecera del colegio
-    let y = 14;
-    if (o.logo && o.logo.data) {
-      const h = 16, w = Math.min(60, h * o.logo.w / o.logo.h);
-      try { doc.addImage(o.logo.data, 'JPEG', M, y, w, h); } catch (e) { /* sin logo */ }
-      doc.setFont(F, 'normal'); doc.setFontSize(8.5); doc.setTextColor(...GRAY);
-      doc.text('Informe de corrección', RIGHT, y + 6, { align: 'right' });
-      if (o.date) doc.text(o.date, RIGHT, y + 10.5, { align: 'right' });
-      y += h + 4;
-    } else {
-      doc.setFont(F, 'bold'); doc.setFontSize(9); doc.setTextColor(...GRAY);
-      doc.text(o.centro || 'Escuelas Salesianas Mª Auxiliadora · Nervión', M, y + 4);
-      doc.setFont(F, 'normal'); doc.text('Informe de corrección' + (o.date ? ' · ' + o.date : ''), RIGHT, y + 4, { align: 'right' });
-      y += 9;
-    }
-    doc.setDrawColor(40); doc.setLineWidth(0.5); doc.line(M, y, RIGHT, y);
-    y += 9;
-    // alumno y nota
-    let size = 20; doc.setFont(F, 'bold'); doc.setFontSize(size);
+    const marco = () => {
+      doc.setFont(F, 'italic'); doc.setFontSize(13); doc.setTextColor(...AZUL);
+      doc.text('La alegría de crecer juntos', M, 15.5);
+      if (corp.logo) { try { doc.addImage(corp.logo.data, 'PNG', 149.5, 8.6, 41.2, 41.2 * corp.logo.h / corp.logo.w, 'corp-logo', 'FAST'); } catch (e) { /* sin logo */ } }
+      doc.setFont(F, 'normal');
+      const pt = '   •   ';
+      tramos(275, [['SALESIANAS NERVIÓN', VERDE_T], [pt, VERDE], ['Escuelas Salesianas María Auxiliadora', AZUL]], 8.5);
+      tramos(278.8, [['C/ SANTA MARÍA MAZZARELLO, 1', AZUL], [pt, VERDE], ['41005 SEVILLA', AZUL], [pt, VERDE], ['954 63 23 47', AZUL], [pt, VERDE], ['www.nervion.salesianas.org', AZUL]], 7);
+      if (corp.franja) { try { doc.addImage(corp.franja.data, 'PNG', 0, 282.6, 210, 10.2, 'corp-franja', 'FAST'); } catch (e) { /* sin franja */ } }
+    };
+    const cabTabla = y => {
+      doc.setFillColor(...CLARO); doc.rect(M, y, RIGHT - M, 6.5, 'F');
+      doc.setFont(F, 'bold'); doc.setFontSize(8); doc.setTextColor(...AZUL);
+      doc.text('PREGUNTA', M + 2, y + 4.4); doc.text('TU RESPUESTA', RIGHT - 9, y + 4.4, { align: 'right' });
+      return y + 6.5;
+    };
+    marco();
+    // título del documento
+    let y = 31;
+    doc.setFont(F, 'bold'); doc.setFontSize(9); doc.setTextColor(...AZUL);
+    doc.text('INFORME DE CORRECCIÓN', M, y, { charSpace: 0.4 });
+    doc.setFont(F, 'normal'); doc.setTextColor(...GRAY);
+    if (o.date) doc.text(o.date, RIGHT, y, { align: 'right' });
+    doc.setDrawColor(...VERDE); doc.setLineWidth(0.8); doc.line(M, y + 2.5, RIGHT, y + 2.5);
+    y += 13;
+    // alumno
+    let size = 19; doc.setFont(F, 'bold'); doc.setFontSize(size);
     const full = (nm.first ? nm.first + ' ' : '') + nm.last;
-    if (doc.getTextWidth(full) > 118) size = 15;
-    doc.setFontSize(size); doc.setFont(F, 'normal'); doc.setTextColor(...INK);
+    if (doc.getTextWidth(full) > 120) size = 14.5;
+    doc.setFontSize(size); doc.setTextColor(...INK);
     let x = M;
-    if (nm.first) { doc.text(nm.first + ' ', x, y); x += doc.getTextWidth(nm.first + ' '); }
+    if (nm.first) { doc.setFont(F, 'normal'); doc.text(nm.first + ' ', x, y); x += doc.getTextWidth(nm.first + ' '); }
     doc.setFont(F, 'bold'); doc.text(nm.last, x, y);
-    doc.setFont(F, 'normal'); doc.setFontSize(10.5); doc.setTextColor(...GRAY);
-    const tl = doc.splitTextToSize(String(o.title || 'Examen'), 118);
+    doc.setFont(F, 'normal'); doc.setFontSize(10.5); doc.setTextColor(...AZUL);
+    const tl = doc.splitTextToSize(String(o.title || 'Examen'), 120);
     doc.text(tl, M, y + 7);
+    doc.setTextColor(...GRAY);
     if (o.group) doc.text(o.group, M, y + 7 + tl.length * 4.6);
-    // caja de la nota
-    const bw = 40, bx = RIGHT - bw, by = y - 8;
-    doc.setDrawColor(200); doc.setLineWidth(0.3); doc.roundedRect(bx, by, bw, 24, 2, 2, 'S');
-    doc.setFont(F, 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY); doc.text('NOTA', bx + bw / 2, by + 5.5, { align: 'center' });
-    doc.setFont(F, 'bold'); doc.setFontSize(22); doc.setTextColor(...INK); doc.text(coma(o.res.nota, 2), bx + bw / 2, by + 15, { align: 'center' });
-    doc.setFont(F, 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY);
-    doc.text(`sobre ${coma(o.scale || 10, (o.scale || 10) % 1 ? 1 : 0)}`, bx + bw / 2, by + 20.5, { align: 'center' });
-    y += 7 + tl.length * 4.6 + (o.group ? 4.6 : 0) + 3;
-    // resumen
-    const r = o.res, chip = (t, col) => { doc.setTextColor(...col); doc.text(t, x2, y); x2 += doc.getTextWidth(t) + 6; };
-    let x2 = M; doc.setFont(F, 'bold'); doc.setFontSize(9.5);
-    chip(`${r.c} ${r.c === 1 ? 'acierto' : 'aciertos'}`, GREEN); chip(`${r.w} ${r.w === 1 ? 'fallo' : 'fallos'}`, RED); chip(`${r.b} en blanco`, GRAY);
-    if (o.penTxt) { doc.setFont(F, 'normal'); chip(o.penTxt, GRAY); }
-    y += 6;
-    doc.setDrawColor(210); doc.setLineWidth(0.2);
+    // nota
+    const bw = 38, bx = RIGHT - bw, by = y - 8.5;
+    doc.setFillColor(...AZUL); doc.roundedRect(bx, by, bw, 25, 2.5, 2.5, 'F');
+    doc.setFont(F, 'bold'); doc.setFontSize(8); doc.setTextColor(255, 255, 255); doc.text('NOTA', bx + bw / 2, by + 5.8, { align: 'center', charSpace: 0.4 });
+    doc.setFontSize(23); doc.text(coma(o.res.nota, 2), bx + bw / 2, by + 15.6, { align: 'center' });
+    doc.setFont(F, 'normal'); doc.setFontSize(8);
+    doc.text(`sobre ${coma(o.scale || 10, (o.scale || 10) % 1 ? 1 : 0)}`, bx + bw / 2, by + 21, { align: 'center' });
+    y += 7 + tl.length * 4.6 + (o.group ? 4.6 : 0) + 5;
+    // resumen en etiquetas
+    const r = o.res;
+    let x2 = M;
+    const chip = (t, col, fondo) => {
+      doc.setFont(F, 'bold'); doc.setFontSize(8.5); const w = doc.getTextWidth(t) + 6;
+      doc.setFillColor(...fondo); doc.roundedRect(x2, y - 4, w, 6, 3, 3, 'F'); doc.setTextColor(...col); doc.text(t, x2 + 3, y + 0.2); x2 += w + 2.5;
+    };
+    chip(`${r.c} ${r.c === 1 ? 'acierto' : 'aciertos'}`, VERDE_T, [244, 246, 214]);
+    chip(`${r.w} ${r.w === 1 ? 'fallo' : 'fallos'}`, NARANJA_T, [253, 234, 222]);
+    chip(`${r.b} en blanco`, GRAY, [238, 240, 242]);
+    if (r.inc) chip(`${r.inc} ${r.inc === 1 ? 'incompleta' : 'incompletas'}`, AZUL, CLARO);
+    const notas = [o.penTxt, r.inc || o.multiTxt && Object.values(o.key).some(k => k && k.a && k.a.length > 1) ? o.multiTxt : ''].filter(Boolean).join(' · ');
+    if (notas) { doc.setFont(F, 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY); doc.text(notas, M, y + 6.5); y += 4; }
+    y += 7;
+    y = cabTabla(y);
 
-    const LW = 96, RX = RIGHT - 9, RWID = 64, FS = 9, LH = 4.3;
+    const LW = 98, RX = RIGHT - 9, RWID = 62, FS = 9, LH = 4.3;
     for (let q = 0; q < o.nq; q++) {
       const k = o.key[q] || {}, st = o.res.det[q], a = o.ans[q] || '';
       doc.setFont(F, 'normal');
       const left = richLines(doc, `${q + 1}. ${k.t || ''}`.trim(), LW, FS);
       const right = []; // [runs, color]
       const add = (txt, col) => richLines(doc, txt, RWID, FS).forEach(l => right.push([l, col]));
+      const ka = String(k.a || '');
       if (st === 'void') add('Pregunta anulada', GRAY);
       else if (st === 'nokey') { add(a ? optT(q, a) : 'Sin responder', GRAY); add('Sin clave de respuestas', GRAY); }
       else {
         if (!a) add('Sin responder · no resta', GRAY);
-        else if (a.length > 1 && st !== 'ok') add('Doble marca (' + a.split('').join(', ') + ') · no resta', GRAY);
-        else if (a.length > 1) a.split('').forEach(L => add(optT(q, L), INK));
-        else add(optT(q, a), st === 'bad' ? RED : INK);
-        if (st !== 'ok') add('Correcta: ' + k.a.split('').map(L => optT(q, L)).join(' / '), GREEN);
+        else if (a.length > 1 && ka.length === 1) add('Doble marca (' + a.split('').join(', ') + ') · no resta', GRAY);
+        else a.split('').forEach(L => add(optT(q, L), st === 'bad' && !ka.includes(L) ? NARANJA_T : INK));
+        if (st === 'inc' || st === 'part') {
+          const faltan = ka.split('').filter(L => !a.includes(L));
+          add((st === 'part' ? `Parte proporcional (${a.length} de ${ka.length}) · ` : 'Incompleta · ') + 'faltó ' + faltan.join(', '), AZUL);
+        }
+        if (st !== 'ok') add((ka.length > 1 ? 'Correctas: ' : 'Correcta: ') + ka.split('').map(L => optT(q, L)).join(' / '), VERDE_T);
       }
       const rowH = Math.max(left.length, right.length) * LH + 5;
-      if (y + rowH > 284) { doc.addPage(); runHead(); y = 18; doc.setDrawColor(210); doc.setLineWidth(0.2); }
-      doc.line(M, y, RIGHT, y);
-      doc.setTextColor(...INK); left.forEach((l, i) => drawRich(doc, l, M, y + 5 + i * LH, FS));
+      if (y + rowH > BOTTOM) {
+        doc.addPage(); marco(); y = 30;
+        doc.setFont(F, 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY);
+        doc.text(`${o.student}  ·  ${o.title || 'Examen'}`, M, y - 3);
+        y = cabTabla(y);
+      }
+      doc.setFont(F, 'normal');
+      doc.setTextColor(...INK); left.forEach((l, i) => drawRich(doc, l, M + 2, y + 5 + i * LH, FS));
       right.forEach(([l, col], i) => { doc.setTextColor(...col); drawRich(doc, l, RX, y + 5 + i * LH, FS, 'right'); });
       // icono
       const cx = RIGHT - 3, cy = y + 4.2;
       doc.setLineWidth(0.5);
       if (st === 'ok' || st === 'bad') {
         const good = st === 'ok';
-        doc.setFillColor(...(good ? GREEN : RED)); doc.circle(cx, cy, 2.6, 'F'); doc.setDrawColor(255);
+        doc.setFillColor(...(good ? VERDE : NARANJA)); doc.circle(cx, cy, 2.6, 'F'); doc.setDrawColor(255);
         if (good) { doc.line(cx - 1.2, cy + 0.1, cx - 0.3, cy + 1.1); doc.line(cx - 0.3, cy + 1.1, cx + 1.3, cy - 1.0); }
         else { doc.line(cx - 1, cy - 1, cx + 1, cy + 1); doc.line(cx - 1, cy + 1, cx + 1, cy - 1); }
+      } else if (st === 'part' || st === 'inc') {
+        doc.setDrawColor(...AZUL); doc.setLineWidth(0.5); doc.circle(cx, cy, 2.4, 'S');
+        if (st === 'part') { doc.setFillColor(...AZUL); doc.circle(cx, cy, 1.3, 'F'); } else doc.line(cx - 1.1, cy, cx + 1.1, cy);
       } else if (st === 'blank') {
         doc.setDrawColor(...SOFT); doc.setLineWidth(0.4); doc.circle(cx, cy, 2.4, 'S'); doc.line(cx - 1.1, cy, cx + 1.1, cy);
       } else if (st === 'void') {
         doc.setDrawColor(...GRAY); doc.setLineWidth(0.4); doc.line(cx - 1.4, cy, cx + 1.4, cy);
       }
-      doc.setDrawColor(210); doc.setLineWidth(0.2);
       y += rowH;
+      doc.setDrawColor(...LINE); doc.setLineWidth(0.2); doc.line(M, y, RIGHT, y);
     }
-    doc.line(M, y, RIGHT, y);
   }
   return { parseDelimited, namesFromRows, namesFromPdfLines, parseKeyText, keyFromRows, parseExamText, grade, splitName, drawReport, richWords };
 })();
@@ -1015,7 +1059,7 @@ const fold = OMR.fold;
 
 /* ---------- estado ---------- */
 const SKEY = 'corrector-test-v1';
-const newExam = () => ({ title: '', group: '', date: todayISO(), nq: 50, nopt: 4, scale: 10, penMode: 'none', penVal: 0.25, code: code4(), key: [] });
+const newExam = () => ({ title: '', group: '', date: todayISO(), nq: 50, nopt: 4, scale: 10, penMode: 'none', penVal: 0.25, multiMode: 'una', code: code4(), key: [] });
 let S = { roster: '', exam: newExam(), sheets: [] };
 try { const o = JSON.parse(localStorage.getItem(SKEY) || 'null'); if (o && o.exam) S = Object.assign(S, o); } catch (e) { /* sin almacenamiento */ }
 const mem = new Map(); // datos solo en memoria por hoja: {img, gray}
@@ -1118,7 +1162,7 @@ $('#f-roster').addEventListener('change', guard(async e => {
 function fillExamFields() {
   const E = S.exam;
   $('#ex-title').value = E.title; $('#ex-group').value = E.group; if (window.cursoMarca) cursoMarca(E.group); $('#ex-date').value = E.date; $('#ex-nq').value = E.nq;
-  $('#ex-nopt').value = String(E.nopt); $('#ex-scale').value = E.scale; $('#ex-pen').value = E.penMode; $('#ex-penval').value = E.penVal;
+  $('#ex-nopt').value = String(E.nopt); $('#ex-scale').value = E.scale; $('#ex-pen').value = E.penMode; $('#ex-penval').value = E.penVal; $('#ex-multi').value = E.multiMode || 'una';
   $('#pen-custom-wrap').hidden = E.penMode !== 'custom';
 }
 const bind = (id, fn) => $('#' + id).addEventListener('input', guard(e => { fn(e.target.value); persist(); renderSteps(); }));
@@ -1128,6 +1172,7 @@ bind('ex-date', v => { S.exam.date = v; });
 bind('ex-scale', v => { const n = parseFloat(v); if (n > 0) S.exam.scale = n; });
 bind('ex-penval', v => { const n = parseFloat(v); if (n >= 0) S.exam.penVal = n; });
 $('#ex-pen').addEventListener('change', e => { S.exam.penMode = e.target.value; $('#pen-custom-wrap').hidden = e.target.value !== 'custom'; persist(); });
+$('#ex-multi').addEventListener('change', e => { S.exam.multiMode = e.target.value; persist(); });
 $('#ex-nopt').addEventListener('change', e => { S.exam.nopt = +e.target.value; renderKeyGrid(); persist(); });
 $('#ex-nq').addEventListener('input', e => {
   const n = Math.floor(+e.target.value);
@@ -1482,7 +1527,7 @@ function studentResult(sid) {
   if (!sheets.length) return null;
   const ans = [], pagesSeen = new Set(), pend = sheets.reduce((n, s) => n + pending(s), 0);
   sheets.forEach(s => { pagesSeen.add(s.page); s.ans.forEach(a => { ans[a.q] = a.pick; }); });
-  const res = LG.grade(E.key, ans, { nq: E.nq, nopt: E.nopt, penMode: E.penMode, penVal: E.penVal, scale: E.scale });
+  const res = LG.grade(E.key, ans, { nq: E.nq, nopt: E.nopt, penMode: E.penMode, penVal: E.penVal, multiMode: E.multiMode, scale: E.scale });
   const need = OMR.pagesFor(E.nq);
   return { res, ans, pend, pagesSeen: pagesSeen.size, need, missing: pagesSeen.size < need };
 }
@@ -1517,7 +1562,7 @@ function renderResults() {
   $('#hist-card').hidden = !notas.length;
   // por pregunta
   const tot = new Array(E.nq).fill(0), okc = new Array(E.nq).fill(0);
-  done.forEach(r => r.r.res.det.forEach((d, q) => { if (d === 'ok' || d === 'bad' || d === 'blank') { tot[q]++; if (d === 'ok') okc[q]++; } }));
+  done.forEach(r => r.r.res.det.forEach((d, q) => { if (d === 'ok' || d === 'bad' || d === 'blank' || d === 'part' || d === 'inc') { tot[q]++; if (d === 'ok') okc[q]++; } }));
   $('#qbars').innerHTML = tot.map((t, q) => { if (!t) return ''; const p = Math.round(okc[q] / t * 100); return `<div class="qbar${p < 30 ? ' low' : ''}"><span>${q + 1}</span><i style="--w:${p}%"></i><span>${p}%</span></div>`; }).join('') || '<span class="hint">Aún no hay datos.</span>';
 }
 $('#restbl').addEventListener('click', guard(async e => {
@@ -1531,28 +1576,54 @@ $('#restbl').addEventListener('click', guard(async e => {
   }
 }));
 
-/* fuente de la marca con símbolos (≡, →, σ, π…) para los informes: Source Sans 3 (licencia SIL OFL), desde jsDelivr */
-const URL_FUENTE = 'https://cdn.jsdelivr.net/npm/@expo-google-fonts/source-sans-3@0.4.2/';
-const FUENTE = { reg: null, bold: null };
+/* informe con la imagen corporativa del colegio: Fira Sans (la de la hoja corporativa) y Source Sans 3 para símbolos que le faltan (≡).
+   Licencia SIL OFL, desde jsDelivr. */
+const URL_FIRA = 'https://cdn.jsdelivr.net/npm/@expo-google-fonts/fira-sans@0.4.1/';
+const URL_SOURCE = 'https://cdn.jsdelivr.net/npm/@expo-google-fonts/source-sans-3@0.4.2/';
+const FUENTES = [
+  ['Corp', 'normal', URL_FIRA + '400Regular/FiraSans_400Regular.ttf'],
+  ['Corp', 'italic', URL_FIRA + '400Regular_Italic/FiraSans_400Regular_Italic.ttf'],
+  ['Corp', 'bold', URL_FIRA + '600SemiBold/FiraSans_600SemiBold.ttf'],
+  ['Simb', 'normal', URL_SOURCE + '400Regular/SourceSans3_400Regular.ttf']
+];
+const FUENTE = { datos: null };
+const b64de = buf => { const b = new Uint8Array(buf); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); };
 async function cargarFuente() {
-  if (FUENTE.reg) return true;
+  if (FUENTE.datos) return true;
   try {
-    const b64 = async u => { const r = await fetch(u); if (!r.ok) throw new Error(u); const b = new Uint8Array(await r.arrayBuffer()); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); };
-    FUENTE.reg = await b64(URL_FUENTE + '400Regular/SourceSans3_400Regular.ttf'); FUENTE.bold = await b64(URL_FUENTE + '700Bold/SourceSans3_700Bold.ttf'); return true;
-  } catch (e) { FUENTE.reg = FUENTE.bold = null; return false; }
+    FUENTE.datos = await Promise.all(FUENTES.map(async ([, , u]) => { const r = await fetch(u); if (!r.ok) throw new Error(u); return b64de(await r.arrayBuffer()); }));
+    return true;
+  } catch (e) { FUENTE.datos = null; return false; }
+}
+/* imágenes de la hoja corporativa (logo de la cabecera y franja del pie) */
+const CORP = {};
+async function cargarCorp() {
+  for (const [k, f] of [['logo', 'informe-logo.png'], ['franja', 'informe-franja.png']]) {
+    if (CORP[k]) continue;
+    try {
+      const r = await fetch('plantillas/' + f); if (!r.ok) continue;
+      const data = 'data:image/png;base64,' + b64de(await r.arrayBuffer());
+      const im = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = data; });
+      CORP[k] = { data, w: im.naturalWidth, h: im.naturalHeight };
+    } catch (e) { /* sin imagen */ }
+  }
+  return CORP;
 }
 async function reportDoc(list) {
-  const E = S.exam, doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
-  let font = 'helvetica';
+  const E = S.exam, doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', compress: true });
+  let font = 'helvetica', alt = null;
   if (await cargarFuente()) {
-    doc.addFileToVFS('informe-regular.ttf', FUENTE.reg); doc.addFont('informe-regular.ttf', 'Informe', 'normal');
-    doc.addFileToVFS('informe-bold.ttf', FUENTE.bold); doc.addFont('informe-bold.ttf', 'Informe', 'bold');
-    font = 'Informe';
+    // la de símbolos solo se añade si algún enunciado u opción la necesita (cada fuente aumenta el tamaño del PDF)
+    const usaSimb = /[≡↔]/.test(JSON.stringify(E.key.slice(0, E.nq)));
+    FUENTES.forEach(([n, st], i) => { if (n === 'Simb' && !usaSimb) return; const f = `${n}-${st}.ttf`; doc.addFileToVFS(f, FUENTE.datos[i]); doc.addFont(f, n, st); });
+    font = 'Corp'; alt = usaSimb ? 'Simb' : null;
   }
+  const corp = await cargarCorp();
   const pen = E.penMode === 'auto' ? `Cada fallo resta 1/${Math.max(1, E.nopt - 1)}` : E.penMode === 'custom' && +E.penVal ? `Cada fallo resta ${String(+E.penVal).replace('.', ',')}` : 'Los fallos no restan';
+  const multi = { una: 'Con varias verdaderas, basta con marcar una', todas: 'Con varias verdaderas, hay que marcarlas todas', parcial: 'Con varias verdaderas, puntúa la parte proporcional' }[E.multiMode || 'una'];
   list.forEach((it, i) => {
     if (i) doc.addPage();
-    LG.drawReport(doc, { student: it.name, group: E.group, title: E.title, date: fmtDate(E.date), res: it.r.res, key: E.key, ans: it.r.ans, nq: E.nq, scale: E.scale, font, logo: LOGO.data ? LOGO : null, penTxt: pen });
+    LG.drawReport(doc, { student: it.name, group: E.group, title: E.title, date: fmtDate(E.date), res: it.r.res, key: E.key, ans: it.r.ans, nq: E.nq, scale: E.scale, font, alt, corp, penTxt: pen, multiTxt: multi });
   });
   return doc;
 }
