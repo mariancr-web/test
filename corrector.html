@@ -15,11 +15,8 @@
 </head>
 <body class="mcr mcr-app curso-general">
 <header class="mcr-barra">
-  <a class="mcr-barra__marca" href="./"><img src="logo-negativo.svg" alt="mariancr"><span class="mcr-barra__nombre">Corrector de test</span></a>
-  <div class="mcr-barra__usuario"><a class="btn sm ghost" href="crear.html">Crear examen</a>
-    <button id="btn-save" class="btn sm ghost">Guardar proyecto</button>
-    <label class="btn sm ghost" for="f-proj">Abrir proyecto</label><input id="f-proj" type="file" accept=".json,application/json" hidden>
-    <button id="btn-new" class="btn sm ghost">Nuevo examen</button></div>
+  <a class="mcr-barra__marca" href="./"><img src="logo-negativo.svg" alt="mariancr"><span class="mcr-barra__nombre">Exámenes tipo test</span></a>
+  <nav class="secciones" aria-label="Secciones"><a href="crear.html">Crear examen</a><a href="corrector.html" aria-current="page">Corregir</a></nav>
 </header>
 <section class="mcr-trama-banda"><div class="mcr-contenedor mcr-hero">
   <p class="hero-etq">Exámenes tipo test</p>
@@ -27,6 +24,12 @@
   <p class="hero-lead">Alumnos, clave, hojas de respuestas con QR, escaneo y notas para iDoceo. Todo se queda en este dispositivo.</p>
 </div></section>
 <div class="app mcr-contenedor">
+  <div class="herramientas" role="toolbar" aria-label="Examen en curso">
+    <span class="herramientas__tit">Examen en curso</span>
+    <button id="btn-new" class="btn sm ghost">Nuevo examen</button>
+    <label class="btn sm ghost" for="f-proj">Abrir proyecto</label><input id="f-proj" type="file" accept=".json,application/json" hidden>
+    <button id="btn-save" class="btn sm ghost">Guardar proyecto</button>
+  </div>
   <nav class="steps" id="steps" aria-label="Pasos"></nav>
 
   <main>

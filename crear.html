@@ -54,9 +54,8 @@ sub,sup{font-size:.72em;line-height:0}
 </head>
 <body class="mcr mcr-app curso-general">
 <header class="mcr-barra">
-  <a class="mcr-barra__marca" href="./"><img src="logo-negativo.svg" alt="mariancr"><span class="mcr-barra__nombre">Generador de tests</span></a>
-  <div class="mcr-barra__usuario"><a class="btn sm ghost" href="corrector.html">Corrector</a>
-    <button id="btn-nuevo" class="btn sm ghost">Empezar de nuevo</button></div>
+  <a class="mcr-barra__marca" href="./"><img src="logo-negativo.svg" alt="mariancr"><span class="mcr-barra__nombre">Exámenes tipo test</span></a>
+  <nav class="secciones" aria-label="Secciones"><a href="crear.html" aria-current="page">Crear examen</a><a href="corrector.html">Corregir</a></nav>
 </header>
 <section class="mcr-trama-banda"><div class="mcr-contenedor mcr-hero">
   <p class="hero-etq">Exámenes tipo test</p>
@@ -64,6 +63,10 @@ sub,sup{font-size:.72em;line-height:0}
   <p class="hero-lead">Pasa a la plantilla del colegio un examen que ya tienes, o genera uno nuevo a partir de tus apuntes. Al final descargas cada modelo en Word, su corregido y la clave.</p>
 </div></section>
 <main class="app mcr-contenedor">
+  <div class="herramientas" role="toolbar" aria-label="Examen en curso">
+    <span class="herramientas__tit">Examen en curso</span>
+    <button id="btn-nuevo" class="btn sm ghost">Empezar de nuevo</button>
+  </div>
 
   <h2 class="mcr-seccion">¿Qué quieres hacer?</h2>
   <div class="modos">
