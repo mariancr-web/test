@@ -28,6 +28,25 @@ fieldset{border:0;padding:0;margin:0;min-width:0}
 .busy{display:inline-block;width:14px;height:14px;border:2px solid var(--line);border-top-color:var(--accent);border-radius:50%;animation:g 1s linear infinite;vertical-align:-2px}
 @keyframes g{to{transform:rotate(360deg)}}
 sub,sup{font-size:.72em;line-height:0}
+.modos{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.modo{text-align:left;cursor:pointer;font:inherit;color:inherit;gap:8px}
+.modo h3{font-size:18px}
+.modo[aria-pressed="true"]{border-color:var(--acento);box-shadow:inset 4px 0 0 var(--acento)}
+.modo ol{margin:4px 0 0;padding-left:18px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:2px}
+.steps{grid-template-columns:repeat(var(--n,5),minmax(0,1fr))}
+.paso[hidden]{display:none}
+.navp{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.pasos-ia{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px}
+.pasos-ia li{padding-left:2px}
+.resumen{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.resumen div{border:1px solid var(--line);padding:8px 10px;border-radius:4px;background:var(--surface)}
+.resumen b{display:block;font:700 20px var(--font-marca)}
+.resumen span{font-size:12px;color:var(--muted)}
+.qedit{display:flex;flex-direction:column;gap:8px}
+.qedit .op{display:flex;gap:8px;align-items:center}
+.qedit .op b{width:20px;font:600 13px var(--mono)}
+.mano-ej{font:13px/1.5 var(--mono);background:var(--soft);padding:8px 10px;border-radius:4px;white-space:pre-wrap;margin:0}
+@media (max-width:640px){.step{min-height:44px;padding:6px 2px}.step .t{font-size:11px}.step:not([aria-current="true"]) .t{display:none}}
 </style>
 </head>
 <body class="mcr mcr-app curso-general">
@@ -39,22 +58,61 @@ sub,sup{font-size:.72em;line-height:0}
 <section class="mcr-trama-banda"><div class="mcr-contenedor mcr-hero">
   <p class="hero-etq">Exámenes tipo test</p>
   <h1>Crear examen</h1>
-  <p class="hero-lead">Carga las preguntas, revisa las respuestas correctas y descarga el examen en la plantilla del colegio con su corregido y su clave.</p>
+  <p class="hero-lead">Pasa a la plantilla del colegio un examen que ya tienes, o genera uno nuevo a partir de tus apuntes. Al final descargas cada modelo en Word, su corregido y la clave.</p>
 </div></section>
 <main class="app mcr-contenedor">
 
-  <!-- 1. Preguntas -->
-  <section class="panel">
-    <h2>1 · Preguntas</h2>
+  <h2 class="mcr-seccion">¿Qué quieres hacer?</h2>
+  <div class="modos">
+    <button class="card modo" data-modo="plantilla" aria-pressed="false">
+      <h3>Pasar un examen a la plantilla</h3>
+      <p class="hint">Ya tienes las preguntas (escritas, en Excel, Word o PDF).</p>
+      <ol><li>Datos</li><li>Contenido</li><li>Preguntas</li><li>Revisión</li><li>Descarga</li></ol>
+    </button>
+    <button class="card modo" data-modo="ia" aria-pressed="false">
+      <h3>Generar un examen nuevo</h3>
+      <p class="hint">Claude redacta las preguntas a partir de tus apuntes.</p>
+      <ol><li>Datos</li><li>Contenido</li><li>Preguntas</li><li>Datos de IA</li><li>Revisión</li><li>Descarga</li></ol>
+    </button>
+  </div>
+
+  <nav id="steps" class="steps" aria-label="Pasos" hidden></nav>
+
+  <!-- Datos -->
+  <section class="panel paso" data-paso="datos" hidden>
+    <h2>Datos</h2>
+    <div class="card">
+      <p class="hint">Salen en la cabecera del examen.</p>
+      <div class="grid">
+        <label class="f">Área<input id="c-area" type="text"></label>
+        <label class="f">Contenido<input id="c-contenido" type="text"></label>
+        <label class="f">Curso<input id="c-curso" data-curso type="text"></label>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contenido (plantilla) -->
+  <section class="panel paso" data-paso="contenido-plantilla" hidden>
+    <h2>Contenido</h2>
     <div class="card">
       <div class="tabs" role="tablist">
-        <button class="tab" data-tab="t-excel" aria-pressed="true">Desde un Excel</button>
-        <button class="tab" data-tab="t-importar" aria-pressed="false">Desde un examen ya hecho</button>
-        <button class="tab" data-tab="t-ia" aria-pressed="false">Con IA desde tus apuntes</button>
+        <button class="tab" data-tab="t-mano" aria-pressed="true">Escribir o pegar</button>
+        <button class="tab" data-tab="t-excel" aria-pressed="false">Desde un Excel</button>
+        <button class="tab" data-tab="t-importar" aria-pressed="false">Desde un Word o PDF</button>
       </div>
 
-      <div id="t-excel" class="tabp" style="display:flex;flex-direction:column;gap:12px">
-        <p class="hint">Si ya tienes las preguntas en un Excel: una fila por pregunta (hoja «Preguntas») y los datos de la cabecera (hoja «Examen»). Descarga la plantilla vacía, rellénala y elígela aquí. También vale la plantilla de clave del Corrector con enunciados y opciones.</p>
+      <div id="t-mano" class="tabp" style="display:flex;flex-direction:column;gap:12px">
+        <p class="hint">Escribe o pega las preguntas numeradas, con las opciones en líneas aparte. Marca la correcta con un asterisco (*) delante, o añade una línea «Respuesta: B». Si hay varias correctas, márcalas todas.</p>
+        <pre class="mano-ej">1. ¿Qué hibridación tiene el carbono del metano?
+a) sp
+b) sp2
+*c) sp3</pre>
+        <textarea id="mano-texto" rows="10"></textarea>
+        <div class="row"><button id="mano-go" class="btn primary">Cargar estas preguntas</button></div>
+      </div>
+
+      <div id="t-excel" class="tabp" hidden style="display:flex;flex-direction:column;gap:12px">
+        <p class="hint">Descarga la plantilla vacía, rellénala (una fila por pregunta en la hoja «Preguntas») y elígela aquí. También vale la clave del Corrector con enunciados y opciones.</p>
         <div class="row">
           <label class="btn primary" for="f-excel">Elegir mi Excel…</label><input id="f-excel" type="file" accept=".xlsx,.xls,.csv" hidden>
           <a class="btn ghost" href="plantillas/plantilla-test.xlsx" download>Descargar plantilla vacía</a>
@@ -62,50 +120,93 @@ sub,sup{font-size:.72em;line-height:0}
       </div>
 
       <div id="t-importar" class="tabp" hidden style="display:flex;flex-direction:column;gap:12px">
-        <p class="hint">Sube un examen tipo test ya hecho en Word (.docx), PDF o texto. Se leen las preguntas numeradas (1., 2.…) y las opciones (a), b)… o A), B)…). La respuesta correcta se reconoce si está en color, resaltada o en negrita, marcada con * o ✓, con una línea «Respuesta: B» o con una clave al final («Soluciones: 1-B 2-C…»). Revisa siempre el resultado.</p>
+        <p class="hint">Sube un examen tipo test ya hecho en Word (.docx), PDF o texto. Se leen las preguntas numeradas (1., 2.…) y las opciones (a), b)… o A), B)…). La respuesta correcta se reconoce si está en color, resaltada o en negrita, marcada con * o ✓, con una línea «Respuesta: B» o con una clave al final («Soluciones: 1-B 2-C…»).</p>
         <div class="row">
           <label class="btn primary" for="f-imp">Elegir el examen (Word o PDF)…</label><input id="f-imp" type="file" accept=".docx,.pdf,.txt" hidden>
           <span id="imp-msg" class="hint"></span>
         </div>
       </div>
-
-      <div id="t-ia" class="tabp" hidden style="display:flex;flex-direction:column;gap:12px">
-        <p class="hint">Sube tus apuntes y elige cómo quieres el test. Las preguntas las redacta Claude a través de su <b>API</b> (servicio de pago por uso de Anthropic, distinto de la suscripción de claude.ai). Hace falta <b>una de dos</b>: la <b>contraseña de la web</b> (usa la clave de API guardada en Vercel) o <b>tu propia clave de API</b> (se crea en <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noopener">console.anthropic.com</a> y se paga desde esa cuenta). Revisa siempre las preguntas antes de imprimir.</p>
-        <div class="row">
-          <label class="btn" for="f-apuntes">Subir apuntes (PDF, Word o texto)</label><input id="f-apuntes" type="file" accept=".pdf,.docx,.txt,.md" multiple hidden>
-          <span id="ap-msg" class="hint"></span>
-        </div>
-        <label class="f">O pega aquí el contenido<textarea id="ia-texto" rows="5" placeholder="Pega el texto de los apuntes…"></textarea></label>
-        <div class="grid">
-          <label class="f">Materia<input id="ia-materia" type="text"></label>
-          <label class="f">Curso<input id="ia-curso" type="text"></label>
-          <label class="f">Número de preguntas<input id="ia-n" type="number" min="1" max="60" value="20" inputmode="numeric"></label>
-          <label class="f">Opciones por pregunta<select id="ia-nopt"><option>3</option><option selected>4</option><option>5</option></select></label>
-          <label class="f">Nivel<select id="ia-nivel"><option value="mixto">Mixto (básico, medio y avanzado)</option><option value="básico">Básico</option><option value="medio">Medio</option><option value="avanzado">Avanzado</option></select></label>
-          <label class="f">Contraseña de la web<input id="ia-clave" type="password" autocomplete="current-password"></label>
-          <label class="f">O tu clave de API<input id="ia-api" type="password" autocomplete="off" placeholder="sk-ant-…" spellcheck="false"></label>
-        </div>
-        <label class="f">Indicaciones (opcional)<textarea id="ia-ind" rows="3" placeholder="Por ejemplo: incluye 4 preguntas de cálculo, evita la nomenclatura, que no haya «todas las anteriores»…"></textarea></label>
-        <label class="row" style="gap:6px;font-size:14px"><input id="ia-api-rec" type="checkbox"> Recordar mi clave de API en este navegador (no la uses en ordenadores compartidos)</label>
-        <div class="row"><button id="ia-go" class="btn primary">Generar preguntas</button><span id="ia-msg" class="hint"></span></div>
-      </div>
     </div>
   </section>
 
-  <!-- 2. Datos -->
-  <section class="panel">
-    <h2>2 · Cabecera y montaje</h2>
+  <!-- Contenido (IA) -->
+  <section class="panel paso" data-paso="contenido-ia" hidden>
+    <h2>Contenido</h2>
+    <div class="card">
+      <p class="hint">Sube los apuntes del tema (o de los temas) que entran en el examen, o pega su texto. Las preguntas saldrán solo de aquí.</p>
+      <div class="row">
+        <label class="btn primary" for="f-apuntes">Subir apuntes (PDF, Word o texto)</label><input id="f-apuntes" type="file" accept=".pdf,.docx,.txt,.md" multiple hidden>
+        <span id="ap-msg" class="hint"></span>
+      </div>
+      <label class="f">O pega aquí el contenido<textarea id="ia-texto" rows="6"></textarea></label>
+    </div>
+  </section>
+
+  <!-- Preguntas (IA: configuración) -->
+  <section class="panel paso" data-paso="config-ia" hidden>
+    <h2>Preguntas</h2>
     <div class="card">
       <div class="grid">
-        <label class="f">Área<input id="c-area" type="text"></label>
-        <label class="f">Contenido<input id="c-contenido" type="text"></label>
-        <label class="f">Curso<input id="c-curso" data-curso type="text"></label>
-        <label class="f">Modelos<input id="c-modelos" type="text"></label>
-        <label class="f">Nota máxima<input id="c-nota" type="number" min="1" step="any" inputmode="decimal"></label>
-        <label class="f">Fallos
-          <select id="c-fallos"><option value="no">No restan</option><option value="auto">Restan 1/(opciones−1)</option><option value="custom">Restan una fracción</option></select></label>
-        <label class="f" id="c-penwrap" hidden>Fracción que resta<input id="c-pen" type="number" min="0" max="1" step="any" inputmode="decimal" value="0.25"></label>
-        <label class="f">Nº de preguntas del banco<input id="c-num" type="number" min="0" placeholder="todas" inputmode="numeric"></label>
+        <label class="f">Número de preguntas<input id="ia-n" type="number" min="1" max="60" value="20" inputmode="numeric"></label>
+        <label class="f">Opciones por pregunta<select id="ia-nopt"><option>3</option><option selected>4</option><option>5</option><option>6</option></select></label>
+        <label class="f">Opciones verdaderas por pregunta<select id="ia-nver"><option selected>1</option><option>2</option><option>3</option></select></label>
+        <label class="f">Nivel<select id="ia-nivel"><option value="mixto">Mixto (básico, medio y avanzado)</option><option value="básico">Básico</option><option value="medio">Medio</option><option value="avanzado">Avanzado</option></select></label>
+      </div>
+      <div id="montaje-ia" class="grid"></div>
+      <label class="f">Indicaciones (opcional)<textarea id="ia-ind" rows="3"></textarea></label>
+      <p class="hint">Por ejemplo: incluye cuatro preguntas de cálculo, no preguntes nomenclatura, evita «todas las anteriores».</p>
+    </div>
+  </section>
+
+  <!-- Datos de IA -->
+  <section class="panel paso" data-paso="ia" hidden>
+    <h2>Datos de IA</h2>
+    <div class="card">
+      <p>Las preguntas las redacta <b>Claude</b> a través de su <b>API</b>, un servicio de pago por uso de Anthropic, distinto de la suscripción de claude.ai. Un test de 20 preguntas cuesta unos céntimos. Necesitas <b>una</b> de estas dos cosas:</p>
+      <h3>Tu propia clave de API</h3>
+      <ol class="pasos-ia">
+        <li>Entra en <a href="https://console.anthropic.com" target="_blank" rel="noopener">console.anthropic.com</a> y crea una cuenta (vale tu correo).</li>
+        <li>En <b>Billing</b> (Facturación), añade saldo con una tarjeta. Con el mínimo hay para muchos exámenes.</li>
+        <li>En <b>API Keys</b>, pulsa <b>Create Key</b>, ponle un nombre (por ejemplo «tests») y copia la clave. Empieza por <code>sk-ant-</code> y solo se ve una vez.</li>
+        <li>Pégala aquí debajo. Se usa solo para esta petición y no se guarda en ningún servidor; si marcas «Recordar», queda guardada solo en este navegador.</li>
+      </ol>
+      <div class="grid">
+        <label class="f">Tu clave de API<input id="ia-api" type="password" autocomplete="off" placeholder="sk-ant-…" spellcheck="false"></label>
+      </div>
+      <label class="row" style="gap:6px;font-size:14px"><input id="ia-api-rec" type="checkbox"> Recordar mi clave en este navegador (no lo marques en ordenadores compartidos)</label>
+      <h3>O la contraseña de esta web</h3>
+      <p class="hint">Si la dueña de la web te la ha dado, se usa su clave de API (y su saldo).</p>
+      <div class="grid">
+        <label class="f">Contraseña de la web<input id="ia-clave" type="password" autocomplete="current-password"></label>
+      </div>
+      <div class="row"><button id="ia-go" class="btn primary">Generar preguntas</button><span id="ia-msg" class="hint"></span></div>
+    </div>
+  </section>
+
+  <!-- Preguntas cargadas (plantilla: paso «Preguntas»; IA: dentro de «Revisión») -->
+  <section class="panel paso" data-paso="lista" hidden>
+    <div class="row between"><h2 id="lista-titulo">Preguntas</h2><span id="q-count" class="chip">0 preguntas</span></div>
+    <div id="leido" class="card" hidden></div>
+    <div id="avisos"></div>
+    <p class="hint">Comprueba que cada pregunta tiene su enunciado, sus opciones y la respuesta correcta. Pulsa una letra para marcarla o desmarcarla como correcta; con «Editar» cambias los textos.</p>
+    <div id="qlist" class="qlist"><p class="empty">Todavía no hay preguntas.</p></div>
+    <div class="row"><button id="q-add" class="btn sm ghost">Añadir pregunta</button></div>
+  </section>
+
+  <!-- Revisión -->
+  <section class="panel paso" data-paso="revision" hidden>
+    <h2>Revisión</h2>
+    <div id="resumen" class="resumen"></div>
+    <div class="card">
+      <div id="montaje-rev" class="grid">
+        <div id="montaje-base" style="display:contents">
+          <label class="f">Número de modelos<input id="c-nmod" type="number" min="1" max="8" inputmode="numeric"></label>
+          <label class="f">Nota máxima<input id="c-nota" type="number" min="1" step="any" inputmode="decimal"></label>
+          <label class="f">Fallos
+            <select id="c-fallos"><option value="no">No restan</option><option value="auto">Restan 1/(opciones−1)</option><option value="custom">Restan una fracción</option></select></label>
+          <label class="f" id="c-penwrap" hidden>Fracción que resta<input id="c-pen" type="number" min="0" max="1" step="any" inputmode="decimal" value="0.25"></label>
+        </div>
+        <label class="f">Preguntas que entran<input id="c-num" type="number" min="0" placeholder="todas" inputmode="numeric"></label>
         <label class="f">Semilla<input id="c-semilla" type="number" min="1" inputmode="numeric"></label>
       </div>
       <div class="row" style="gap:18px">
@@ -115,20 +216,13 @@ sub,sup{font-size:.72em;line-height:0}
       </div>
       <label class="f">Observaciones (vacío = se escriben solas)<input id="c-obs" type="text"></label>
       <p class="hint" id="c-obs-auto"></p>
+      <p class="hint">«Preguntas que entran»: si pones menos que las que hay, cada modelo coge ese número al azar. La semilla fija el barajado: con la misma semilla salen los mismos modelos.</p>
     </div>
   </section>
 
-  <!-- 3. Revisión -->
-  <section class="panel">
-    <div class="row between"><h2>3 · Revisión</h2><span id="q-count" class="chip">0 preguntas</span></div>
-    <div id="avisos"></div>
-    <p class="hint">Pulsa una letra para cambiar la respuesta correcta. Para corregir textos, descarga el Excel, edítalo y vuelve a subirlo.</p>
-    <div id="qlist" class="qlist"><p class="empty">Todavía no hay preguntas.</p></div>
-  </section>
-
-  <!-- 4. Descargas -->
-  <section class="panel">
-    <h2>4 · Descargar</h2>
+  <!-- Descarga -->
+  <section class="panel paso" data-paso="descarga" hidden>
+    <h2>Descarga</h2>
     <div class="card">
       <div class="row">
         <button id="d-zip" class="btn primary">Todo en un .zip</button>
@@ -136,9 +230,11 @@ sub,sup{font-size:.72em;line-height:0}
         <span id="d-msg" class="hint"></span>
       </div>
       <div id="d-modelos"></div>
-      <p class="hint">«Al Corrector» abre ese modelo en el Corrector con su clave, enunciados y penalización; luego solo tienes que añadir los alumnos e imprimir las hojas de respuestas.</p>
+      <p class="hint">«Al Corrector» abre ese modelo en el Corrector con su clave, enunciados y penalización; luego solo tienes que añadir los alumnos e imprimir las hojas de respuestas. El «Excel de preguntas» te sirve para guardarlas y reutilizarlas.</p>
     </div>
   </section>
+
+  <div id="navp" class="navp" hidden><button id="p-ant" class="btn">← Anterior</button><button id="p-sig" class="btn primary">Siguiente →</button></div>
 </main>
 <footer class="mcr-pie-app">mariancr · Exámenes tipo test</footer>
 
