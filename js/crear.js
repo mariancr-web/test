@@ -182,15 +182,22 @@ $('#f-apuntes').addEventListener('change', guard(async e => {
   } catch (err) { $('#ap-msg').textContent = ''; throw err; }
 }));
 try { $('#ia-clave').value = sessionStorage.getItem('gt-clave') || ''; } catch (e) { /* nada */ }
+try { const k = localStorage.getItem('gt-api') || sessionStorage.getItem('gt-api') || ''; $('#ia-api').value = k; $('#ia-api-rec').checked = !!localStorage.getItem('gt-api'); } catch (e) { /* nada */ }
+$('#ia-api-rec').addEventListener('change', () => { try { if (!$('#ia-api-rec').checked) localStorage.removeItem('gt-api'); } catch (e) { /* nada */ } });
 $('#ia-go').addEventListener('click', guard(async () => {
   const texto = apuntes.map(a => `### ${a.nombre}\n${a.texto}`).join('\n\n') + ($('#ia-texto').value.trim() ? '\n\n' + $('#ia-texto').value.trim() : '');
   if (texto.trim().length < 200) { toast('Sube los apuntes o pega su contenido (hace falta algo de texto).', true); return; }
   if (texto.length > 600000) { toast('Los apuntes son muy largos. Sube solo el tema que entra en el examen.', true); return; }
   const clave = $('#ia-clave').value;
-  if (!clave) { toast('Escribe la contraseña de la web.', true); return; }
-  try { sessionStorage.setItem('gt-clave', clave); } catch (e) { /* nada */ }
+  const apiKey = $('#ia-api').value.trim();
+  if (!clave && !apiKey) { toast('Escribe la contraseña de la web o tu propia clave de API.', true); return; }
+  if (apiKey && !/^sk-ant-/.test(apiKey)) { toast('La clave de API de Anthropic empieza por «sk-ant-».', true); return; }
+  try {
+    if (clave) sessionStorage.setItem('gt-clave', clave);
+    if (apiKey) { sessionStorage.setItem('gt-api', apiKey); if ($('#ia-api-rec').checked) localStorage.setItem('gt-api', apiKey); else localStorage.removeItem('gt-api'); }
+  } catch (e) { /* nada */ }
   const body = {
-    clave, apuntes: texto, materia: $('#ia-materia').value.trim() || S.cfg.area, curso: $('#ia-curso').value.trim() || S.cfg.curso,
+    clave, apiKey, apuntes: texto, materia: $('#ia-materia').value.trim() || S.cfg.area, curso: $('#ia-curso').value.trim() || S.cfg.curso,
     tema: S.cfg.contenido, n: Math.min(60, Math.max(1, parseInt($('#ia-n').value, 10) || 20)), nopt: +$('#ia-nopt').value,
     nivel: $('#ia-nivel').value, indicaciones: $('#ia-ind').value.trim()
   };
