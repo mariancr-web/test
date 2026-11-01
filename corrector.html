@@ -147,6 +147,27 @@
     </div>
     <div class="card" id="hist-card"><h3>Reparto de notas</h3><div id="hist" class="hist"></div></div>
     <div class="card"><details><summary>Aciertos por pregunta</summary><p class="hint" style="margin:6px 0 10px">En rojo, las preguntas con menos del 30 % de aciertos: conviene revisar la clave o el enunciado.</p><div id="qbars" class="qbars"></div></details></div>
+    <div class="card" id="cls-card"><details id="cls"><summary>Paso extra (opcional): subir notas e informes a Classroom</summary>
+      <p class="hint" style="margin:6px 0 10px">Crea una tarea en Classroom, adjunta a cada alumno el enlace a <b>su</b> informe (compartido solo con él en Drive) y le pone la nota. Se hace con una hoja de cálculo de Google de tu cuenta del colegio; la web no toca Classroom.</p>
+      <h3 style="font-size:15px;margin:14px 0 4px">Preparar (solo la primera vez)</h3>
+      <ol style="margin:4px 0 12px;padding-left:22px;line-height:1.55;font-size:14px">
+        <li>En Google Drive, con tu cuenta del colegio, crea una hoja de cálculo nueva (por ejemplo «Classroom · notas de tests»).</li>
+        <li>En la hoja: <b>Extensiones → Apps Script</b>. Borra lo que haya, pega el código (botón de abajo) y guarda.</li>
+        <li>En el editor de Apps Script, a la izquierda: <b>Servicios → +</b>, elige <b>Google Classroom API</b> y pulsa <b>Añadir</b>.</li>
+        <li>Vuelve a la hoja y recárgala. Aparece el menú <b>Classroom</b>: pulsa <b>Preparar la hoja</b> y acepta los permisos.</li>
+      </ol>
+      <div class="row"><button class="btn" id="cls-copy">Copiar el código</button><button class="btn ghost" id="cls-dl">Descargar el código (.gs)</button></div>
+      <h3 style="font-size:15px;margin:18px 0 4px">Con cada examen</h3>
+      <ol style="margin:4px 0 12px;padding-left:22px;line-height:1.55;font-size:14px">
+        <li>Aquí arriba, descarga <b>Notas (.xlsx)</b> e <b>Informes por alumno (.zip)</b>.</li>
+        <li>Descomprime el .zip, sube la carpeta con los PDF a tu Drive y copia el enlace de la carpeta.</li>
+        <li>En la hoja, pestaña <b>Notas</b>: pega las columnas «Alumno» y «Nota» del Excel, desde la fila 2.</li>
+        <li>Pestaña <b>Configuración</b>: elige la clase (la primera vez, menú <b>Classroom → 1. Cargar mis clases</b>), el título de la tarea, la nota máxima, el enlace de la carpeta y si las notas quedan en <b>borrador</b> o se <b>devuelven</b> a los alumnos.</li>
+        <li>Menú <b>2. Comprobar alumnos</b>: empareja nombres e informes sin tocar Classroom. Corrige lo que salga «NO ENCONTRADO».</li>
+        <li>Menú <b>3. Crear tarea y poner notas</b>.</li>
+      </ol>
+      <p class="hint">Los nombres se emparejan aunque cambie el orden o falten tildes. Classroom solo deja poner nota en tareas creadas por el propio script. Si el colegio tiene bloqueados los scripts o la API de Classroom, lo tiene que permitir el coordinador TIC.</p>
+    </details></div>
     <div class="nav"><button class="btn ghost" data-go="p4">Atrás</button></div>
   </section>
   </main>
@@ -1627,6 +1648,14 @@ async function reportDoc(list) {
   });
   return doc;
 }
+/* paso extra: código de Apps Script para Classroom */
+const codigoClassroom = async () => { const r = await fetch('plantillas/classroom.gs', { cache: 'no-store' }); if (!r.ok) throw new Error('No se ha podido cargar el código.'); return r.text(); };
+$('#cls-copy').onclick = guard(async () => {
+  const t = await codigoClassroom();
+  try { await navigator.clipboard.writeText(t); toast('Código copiado. Pégalo en Apps Script.'); }
+  catch (e) { await saveFile('Codigo.gs', new Blob([t], { type: 'text/plain' })); toast('No se ha podido copiar: lo he descargado como Codigo.gs.'); }
+});
+$('#cls-dl').onclick = guard(async () => { await saveFile('Codigo.gs', new Blob([await codigoClassroom()], { type: 'text/plain' })); });
 const doneList = () => allResults().filter(r => r.r);
 function notesRows() {
   const E = S.exam;
