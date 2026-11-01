@@ -817,7 +817,9 @@ const LG = (() => {
       if (!k.a) { det[q] = 'nokey'; nokey++; continue; }
       const p = +k.p > 0 ? +k.p : 1; max += p;
       const a = ans[q] || '';
-      if (!a || a.length > 1) { b++; det[q] = 'blank'; }
+      const todas = a.length > 1 && k.a.length > 1 && [...a].sort().join('') === [...k.a].sort().join(''); // marcó todas las verdaderas
+      if (todas) { c++; pts += p; det[q] = 'ok'; }
+      else if (!a || a.length > 1) { b++; det[q] = 'blank'; }
       else if (k.a.includes(a)) { c++; pts += p; det[q] = 'ok'; }
       else { w++; pts -= p * pen; det[q] = 'bad'; }
     }
@@ -835,74 +837,164 @@ const LG = (() => {
     return { first: '', last: n };
   }
 
+  /* Texto con fórmulas → trozos {t, sub, sup}. Admite `fórmula`, ^sup, _sub y reconoce fórmulas químicas sueltas (CO2, K2Cr2O7, Fe3+). */
+  const reFormula = /^\d*(?:[A-Z][a-z]?|\(|\)|\[|\]|·|\d+)+$/;
+  function trozosPalabra(w) {
+    const out = [], push = (t, k) => { if (!t) return; const l = out[out.length - 1]; if (l && !!l.sub === (k === 'sub') && !!l.sup === (k === 'sup')) l.t += t; else out.push({ t, sub: k === 'sub', sup: k === 'sup' }); };
+    const m = w.match(/^([(\[«"']*)(.*?)([)\].,;:!?»"']*)$/);
+    let pre = m[1], core = m[2], post = m[3];
+    // quita del final los cierres que son parte de la fórmula, p. ej. Ca(OH)2
+    if (/\)$/.test(pre + core) === false && post.startsWith(')') && /\(/.test(core)) { core += ')'; post = post.slice(1); }
+    const trozo = part => {
+      let carga = '', base = part;
+      const mc = part.match(/^(.*[A-Za-z)\]\d])(\d*[+\-−])$/);
+      if (mc && reFormula.test(mc[1]) && /[A-Z]/.test(mc[1])) { base = mc[1]; carga = mc[2]; }
+      const esFormula = base.length > 1 && reFormula.test(base) && /[A-Z]/.test(base) && (/[A-Za-z)\]]\d/.test(base) || carga);
+      if (esFormula) {
+        const lead = base.match(/^\d*/)[0]; push(lead);
+        for (let k = lead.length; k < base.length; k++) { const ch = base[k]; push(ch, /\d/.test(ch) ? 'sub' : ''); }
+        if (carga) push(carga.replace('-', '−'), 'sup');
+        return true;
+      }
+      return false;
+    };
+    push(pre);
+    if (!trozo(core)) {
+      if (/[=≡]|^[–\-]/.test(core) && !/\^|_/.test(core)) { // CH2=CH2, HC≡CH, –CONH2
+        core.split(/([=≡–\-])/).forEach(p => { if (!trozo(p)) push(p); });
+      } else {
+        // ^ y _ sueltos
+        const re = /\^([+\-−]?[\w.]*[+\-−]?)|_(\w+)/g; let last = 0, r;
+        while ((r = re.exec(core))) { push(core.slice(last, r.index)); if (r[0][0] === '^') push(r[1].replace('-', '−'), 'sup'); else push(r[2], 'sub'); last = re.lastIndex; }
+        push(core.slice(last));
+      }
+    }
+    push(post);
+    return out;
+  }
+  function richWords(text) { return String(text || '').replace(/`/g, '').split(/\s+/).filter(Boolean).map(trozosPalabra); }
+  function runW(doc, r, size) { doc.setFontSize(r.sub || r.sup ? size * 0.68 : size); const w = doc.getTextWidth(r.t); doc.setFontSize(size); return w; }
+  function wordW(doc, wd, size) { return wd.reduce((s, r) => s + runW(doc, r, size), 0); }
+  // parte el texto en líneas de como mucho maxW mm
+  function richLines(doc, text, maxW, size) {
+    doc.setFontSize(size); const sp = doc.getTextWidth(' ');
+    const lines = []; let cur = [], w = 0;
+    richWords(text).forEach(wd => {
+      const ww = wordW(doc, wd, size);
+      if (cur.length && w + sp + ww > maxW) { lines.push(cur); cur = []; w = 0; }
+      if (cur.length) { cur.push({ t: ' ' }); w += sp; }
+      cur.push(...wd); w += ww;
+    });
+    if (cur.length) lines.push(cur);
+    return lines;
+  }
+  function drawRich(doc, runs, x, y, size, align) {
+    if (align === 'right') x -= runs.reduce((s, r) => s + runW(doc, r, size), 0);
+    runs.forEach(r => {
+      const k = size / 9;
+      doc.setFontSize(r.sub || r.sup ? size * 0.68 : size);
+      doc.text(r.t, x, y + (r.sub ? 0.9 * k : r.sup ? -1.25 * k : 0));
+      x += doc.getTextWidth(r.t);
+    });
+    doc.setFontSize(size);
+  }
+  const coma = (n, d) => (Math.round(n * 10 ** d) / 10 ** d).toFixed(d).replace('.', ',');
+
+  // o: {student, group, title, date, res, key, ans, nq, font, logo:{data,w,h}, centro}
   function drawReport(doc, o) {
-    const M = 18, RIGHT = 210 - M, GREEN = [34, 150, 84], RED = [205, 64, 60], GRAY = [130, 130, 130], INK = [25, 30, 36];
+    const F = o.font || 'helvetica';
+    const M = 18, RIGHT = 210 - M, GREEN = [34, 150, 84], RED = [205, 64, 60], GRAY = [120, 124, 130], INK = [25, 30, 36], SOFT = [150, 154, 160];
     const nm = splitName(o.student);
     const optT = (q, L) => { const t = o.key[q] && o.key[q].o && o.key[q].o[L]; return t ? `${L}) ${t}` : L; };
     const runHead = () => {
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY);
+      doc.setFont(F, 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY);
       doc.text(`${o.student}  ·  ${o.title || 'Examen'}`, M, 12);
     };
-    // cabecera
-    let size = 22; doc.setFont('helvetica', 'normal'); doc.setFontSize(size);
+    // cabecera del colegio
+    let y = 14;
+    if (o.logo && o.logo.data) {
+      const h = 16, w = Math.min(60, h * o.logo.w / o.logo.h);
+      try { doc.addImage(o.logo.data, 'JPEG', M, y, w, h); } catch (e) { /* sin logo */ }
+      doc.setFont(F, 'normal'); doc.setFontSize(8.5); doc.setTextColor(...GRAY);
+      doc.text('Informe de corrección', RIGHT, y + 6, { align: 'right' });
+      if (o.date) doc.text(o.date, RIGHT, y + 10.5, { align: 'right' });
+      y += h + 4;
+    } else {
+      doc.setFont(F, 'bold'); doc.setFontSize(9); doc.setTextColor(...GRAY);
+      doc.text(o.centro || 'Escuelas Salesianas Mª Auxiliadora · Nervión', M, y + 4);
+      doc.setFont(F, 'normal'); doc.text('Informe de corrección' + (o.date ? ' · ' + o.date : ''), RIGHT, y + 4, { align: 'right' });
+      y += 9;
+    }
+    doc.setDrawColor(40); doc.setLineWidth(0.5); doc.line(M, y, RIGHT, y);
+    y += 9;
+    // alumno y nota
+    let size = 20; doc.setFont(F, 'bold'); doc.setFontSize(size);
     const full = (nm.first ? nm.first + ' ' : '') + nm.last;
-    doc.setFont('helvetica', 'bold'); if (doc.getTextWidth(full) > 120) { size = 16; }
-    doc.setFontSize(size); doc.setFont('helvetica', 'normal'); doc.setTextColor(...INK);
+    if (doc.getTextWidth(full) > 118) size = 15;
+    doc.setFontSize(size); doc.setFont(F, 'normal'); doc.setTextColor(...INK);
     let x = M;
-    if (nm.first) { doc.text(nm.first + ' ', x, M + 6); x += doc.getTextWidth(nm.first + ' '); }
-    doc.setFont('helvetica', 'bold'); doc.text(nm.last, x, M + 6);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(11); doc.setTextColor(...GRAY);
-    if (o.group) doc.text(o.group, M, M + 13);
-    doc.setDrawColor(40); doc.setLineWidth(0.5); doc.line(M, M + 18, RIGHT, M + 18);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(11); doc.setTextColor(...INK);
-    const tl = doc.splitTextToSize(String(o.title || 'Examen'), 110);
-    doc.text(tl, M, M + 26);
-    doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...GRAY);
-    if (o.date) doc.text(o.date, M, M + 26 + tl.length * 4.6);
-    doc.setFont('helvetica', 'bold'); doc.setFontSize(20); doc.setTextColor(...INK);
-    doc.text(o.res.nota.toFixed(2), RIGHT, M + 27, { align: 'right' });
-    doc.setFontSize(11); doc.text(`${o.res.c}/${o.res.max ? Math.round(o.res.max) : o.res.total}`, RIGHT, M + 33, { align: 'right' });
-    let y = M + 26 + Math.max(tl.length * 4.6 + (o.date ? 5 : 0), 12) + 4;
+    if (nm.first) { doc.text(nm.first + ' ', x, y); x += doc.getTextWidth(nm.first + ' '); }
+    doc.setFont(F, 'bold'); doc.text(nm.last, x, y);
+    doc.setFont(F, 'normal'); doc.setFontSize(10.5); doc.setTextColor(...GRAY);
+    const tl = doc.splitTextToSize(String(o.title || 'Examen'), 118);
+    doc.text(tl, M, y + 7);
+    if (o.group) doc.text(o.group, M, y + 7 + tl.length * 4.6);
+    // caja de la nota
+    const bw = 40, bx = RIGHT - bw, by = y - 8;
+    doc.setDrawColor(200); doc.setLineWidth(0.3); doc.roundedRect(bx, by, bw, 24, 2, 2, 'S');
+    doc.setFont(F, 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY); doc.text('NOTA', bx + bw / 2, by + 5.5, { align: 'center' });
+    doc.setFont(F, 'bold'); doc.setFontSize(22); doc.setTextColor(...INK); doc.text(coma(o.res.nota, 2), bx + bw / 2, by + 15, { align: 'center' });
+    doc.setFont(F, 'normal'); doc.setFontSize(8); doc.setTextColor(...GRAY);
+    doc.text(`sobre ${coma(o.scale || 10, (o.scale || 10) % 1 ? 1 : 0)}`, bx + bw / 2, by + 20.5, { align: 'center' });
+    y += 7 + tl.length * 4.6 + (o.group ? 4.6 : 0) + 3;
+    // resumen
+    const r = o.res, chip = (t, col) => { doc.setTextColor(...col); doc.text(t, x2, y); x2 += doc.getTextWidth(t) + 6; };
+    let x2 = M; doc.setFont(F, 'bold'); doc.setFontSize(9.5);
+    chip(`${r.c} ${r.c === 1 ? 'acierto' : 'aciertos'}`, GREEN); chip(`${r.w} ${r.w === 1 ? 'fallo' : 'fallos'}`, RED); chip(`${r.b} en blanco`, GRAY);
+    if (o.penTxt) { doc.setFont(F, 'normal'); chip(o.penTxt, GRAY); }
+    y += 6;
     doc.setDrawColor(210); doc.setLineWidth(0.2);
 
-    const LW = 92, RX = RIGHT - 10, RWID = 66;
+    const LW = 96, RX = RIGHT - 9, RWID = 64, FS = 9, LH = 4.3;
     for (let q = 0; q < o.nq; q++) {
       const k = o.key[q] || {}, st = o.res.det[q], a = o.ans[q] || '';
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(9);
-      const left = doc.splitTextToSize(`${q + 1}. ${k.t || ''}`.trim(), LW);
-      const right = [];
-      if (st === 'void') right.push([ 'Pregunta anulada', GRAY ]);
-      else if (st === 'nokey') right.push([ a ? optT(q, a) : 'Sin responder', GRAY ], [ 'Sin clave de respuestas', GRAY ]);
+      doc.setFont(F, 'normal');
+      const left = richLines(doc, `${q + 1}. ${k.t || ''}`.trim(), LW, FS);
+      const right = []; // [runs, color]
+      const add = (txt, col) => richLines(doc, txt, RWID, FS).forEach(l => right.push([l, col]));
+      if (st === 'void') add('Pregunta anulada', GRAY);
+      else if (st === 'nokey') { add(a ? optT(q, a) : 'Sin responder', GRAY); add('Sin clave de respuestas', GRAY); }
       else {
-        if (!a) right.push([ 'Sin responder', GRAY ]);
-        else if (a.length > 1) right.push([ 'Doble marca (' + a + ')', GRAY ]);
-        else doc.splitTextToSize(optT(q, a), RWID).forEach(t => right.push([ t, INK ]));
-        if (st !== 'ok') doc.splitTextToSize('Correcta: ' + k.a.split('').map(L => optT(q, L)).join(' / '), RWID).forEach(t => right.push([ t, GREEN ]));
+        if (!a) add('Sin responder · no resta', GRAY);
+        else if (a.length > 1 && st !== 'ok') add('Doble marca (' + a.split('').join(', ') + ') · no resta', GRAY);
+        else if (a.length > 1) a.split('').forEach(L => add(optT(q, L), INK));
+        else add(optT(q, a), st === 'bad' ? RED : INK);
+        if (st !== 'ok') add('Correcta: ' + k.a.split('').map(L => optT(q, L)).join(' / '), GREEN);
       }
-      const rowH = Math.max(left.length, right.length) * 4.1 + 5;
+      const rowH = Math.max(left.length, right.length) * LH + 5;
       if (y + rowH > 284) { doc.addPage(); runHead(); y = 18; doc.setDrawColor(210); doc.setLineWidth(0.2); }
       doc.line(M, y, RIGHT, y);
-      doc.setFont('helvetica', 'normal'); doc.setFontSize(9); doc.setTextColor(...INK);
-      doc.text(left, M, y + 5);
-      right.forEach(([t, col], i) => { doc.setTextColor(...col); doc.text(t, RX, y + 5 + i * 4.1, { align: 'right' }); });
+      doc.setTextColor(...INK); left.forEach((l, i) => drawRich(doc, l, M, y + 5 + i * LH, FS));
+      right.forEach(([l, col], i) => { doc.setTextColor(...col); drawRich(doc, l, RX, y + 5 + i * LH, FS, 'right'); });
       // icono
       const cx = RIGHT - 3, cy = y + 4.2;
-      if (st === 'ok' || st === 'bad' || st === 'blank') {
-        const good = st === 'ok'; const col = good ? GREEN : RED;
-        doc.setFillColor(...col); doc.circle(cx, cy, 2.6, 'F');
-        doc.setDrawColor(255); doc.setLineWidth(0.5);
+      doc.setLineWidth(0.5);
+      if (st === 'ok' || st === 'bad') {
+        const good = st === 'ok';
+        doc.setFillColor(...(good ? GREEN : RED)); doc.circle(cx, cy, 2.6, 'F'); doc.setDrawColor(255);
         if (good) { doc.line(cx - 1.2, cy + 0.1, cx - 0.3, cy + 1.1); doc.line(cx - 0.3, cy + 1.1, cx + 1.3, cy - 1.0); }
         else { doc.line(cx - 1, cy - 1, cx + 1, cy + 1); doc.line(cx - 1, cy + 1, cx + 1, cy - 1); }
-        doc.setDrawColor(210); doc.setLineWidth(0.2);
+      } else if (st === 'blank') {
+        doc.setDrawColor(...SOFT); doc.setLineWidth(0.4); doc.circle(cx, cy, 2.4, 'S'); doc.line(cx - 1.1, cy, cx + 1.1, cy);
       } else if (st === 'void') {
-        doc.setDrawColor(...GRAY); doc.setLineWidth(0.4); doc.line(cx - 1.4, cy, cx + 1.4, cy); doc.setDrawColor(210); doc.setLineWidth(0.2);
+        doc.setDrawColor(...GRAY); doc.setLineWidth(0.4); doc.line(cx - 1.4, cy, cx + 1.4, cy);
       }
+      doc.setDrawColor(210); doc.setLineWidth(0.2);
       y += rowH;
     }
     doc.line(M, y, RIGHT, y);
   }
-
-  return { parseDelimited, namesFromRows, namesFromPdfLines, parseKeyText, keyFromRows, parseExamText, grade, splitName, drawReport };
+  return { parseDelimited, namesFromRows, namesFromPdfLines, parseKeyText, keyFromRows, parseExamText, grade, splitName, drawReport, richWords };
 })();
 if (typeof module !== 'undefined') module.exports = LG;
 
@@ -1434,16 +1526,33 @@ $('#restbl').addEventListener('click', guard(async e => {
   if (b.dataset.a === 'rev') { const s = activeSheets(sid)[0]; if (s) openReview(s.id); }
   if (b.dataset.a === 'rep') {
     const r = studentResult(sid); if (!r) return;
-    const doc = reportDoc([{ sid, name: students()[sid - 1], r }]);
+    const doc = await reportDoc([{ sid, name: students()[sid - 1], r }]);
     await saveFile(`Informe - ${students()[sid - 1]}.pdf`, doc.output('blob'));
   }
 }));
 
-function reportDoc(list) {
+/* fuente de la marca con símbolos (≡, →, σ, π…) para los informes: Source Sans 3 (licencia SIL OFL), desde jsDelivr */
+const URL_FUENTE = 'https://cdn.jsdelivr.net/npm/@expo-google-fonts/source-sans-3@0.4.2/';
+const FUENTE = { reg: null, bold: null };
+async function cargarFuente() {
+  if (FUENTE.reg) return true;
+  try {
+    const b64 = async u => { const r = await fetch(u); if (!r.ok) throw new Error(u); const b = new Uint8Array(await r.arrayBuffer()); let s = ''; for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode.apply(null, b.subarray(i, i + 0x8000)); return btoa(s); };
+    FUENTE.reg = await b64(URL_FUENTE + '400Regular/SourceSans3_400Regular.ttf'); FUENTE.bold = await b64(URL_FUENTE + '700Bold/SourceSans3_700Bold.ttf'); return true;
+  } catch (e) { FUENTE.reg = FUENTE.bold = null; return false; }
+}
+async function reportDoc(list) {
   const E = S.exam, doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4' });
+  let font = 'helvetica';
+  if (await cargarFuente()) {
+    doc.addFileToVFS('informe-regular.ttf', FUENTE.reg); doc.addFont('informe-regular.ttf', 'Informe', 'normal');
+    doc.addFileToVFS('informe-bold.ttf', FUENTE.bold); doc.addFont('informe-bold.ttf', 'Informe', 'bold');
+    font = 'Informe';
+  }
+  const pen = E.penMode === 'auto' ? `Cada fallo resta 1/${Math.max(1, E.nopt - 1)}` : E.penMode === 'custom' && +E.penVal ? `Cada fallo resta ${String(+E.penVal).replace('.', ',')}` : 'Los fallos no restan';
   list.forEach((it, i) => {
     if (i) doc.addPage();
-    LG.drawReport(doc, { student: it.name, group: E.group, title: E.title, date: fmtDate(E.date), res: it.r.res, key: E.key, ans: it.r.ans, nq: E.nq });
+    LG.drawReport(doc, { student: it.name, group: E.group, title: E.title, date: fmtDate(E.date), res: it.r.res, key: E.key, ans: it.r.ans, nq: E.nq, scale: E.scale, font, logo: LOGO.data ? LOGO : null, penTxt: pen });
   });
   return doc;
 }
@@ -1465,14 +1574,14 @@ $('#x-csv').onclick = guard(async () => {
 });
 $('#x-pdf').onclick = guard(async () => {
   const l = doneList(); if (!l.length) { toast('Todavía no hay alumnos con hoja escaneada.', true); return; }
-  await saveFile(`Informes - ${S.exam.title || 'examen'}.pdf`, reportDoc(l.map(x => ({ sid: x.sid, name: x.name, r: x.r }))).output('blob'));
+  await saveFile(`Informes - ${S.exam.title || 'examen'}.pdf`, (await reportDoc(l.map(x => ({ sid: x.sid, name: x.name, r: x.r })))).output('blob'));
 });
 $('#x-zip').onclick = guard(async () => {
   const l = doneList(); if (!l.length) { toast('Todavía no hay alumnos con hoja escaneada.', true); return; }
   const zip = new JSZip(), used = new Set(); let n = 0;
   for (const x of l) {
     let nm = safeName(x.name), k = nm, c = 2; while (used.has(k)) k = nm + ' ' + c++; used.add(k);
-    zip.file(`${k}.pdf`, reportDoc([{ sid: x.sid, name: x.name, r: x.r }]).output('arraybuffer'));
+    zip.file(`${k}.pdf`, (await reportDoc([{ sid: x.sid, name: x.name, r: x.r }])).output('arraybuffer'));
     n++; if (n % 3 === 0) { $('#x-prog').textContent = `Informe ${n} de ${l.length}…`; await sleep(); }
   }
   $('#x-prog').textContent = 'Comprimiendo…'; await sleep();
