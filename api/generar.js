@@ -16,11 +16,11 @@ const ESQUEMA = {
       items: {
         type: 'object',
         additionalProperties: false,
-        required: ['pregunta', 'opciones', 'correcta', 'nivel', 'apartado', 'explicacion', 'ordenFijo'],
+        required: ['pregunta', 'opciones', 'correctas', 'nivel', 'apartado', 'explicacion', 'ordenFijo'],
         properties: {
           pregunta: { type: 'string' },
           opciones: { type: 'array', items: { type: 'string' } },
-          correcta: { type: 'string', enum: LET.split('') },
+          correctas: { type: 'array', items: { type: 'string', enum: LET.split('') } },
           nivel: { type: 'string', enum: ['básico', 'medio', 'avanzado'] },
           apartado: { type: 'string' },
           explicacion: { type: 'string' },
@@ -41,7 +41,7 @@ Cómo escribir las fórmulas (el texto se convierte después a Word):
 
 Reglas de las preguntas:
 - Basa cada pregunta solo en el contenido de los apuntes, respetando su nivel y su vocabulario.
-- Una única respuesta correcta por pregunta, sin ambigüedad. Los distractores deben ser plausibles y salir de errores típicos del alumnado, con longitud y estilo parecidos a la correcta.
+- Cada pregunta tiene exactamente el número de opciones verdaderas que se pide (normalmente una), sin ambigüedad: las demás son claramente falsas. En «correctas» van las letras de todas las verdaderas. Si hay más de una verdadera, el enunciado debe decirlo (por ejemplo «Señala las dos afirmaciones correctas»). Los distractores deben ser plausibles y salir de errores típicos del alumnado, con longitud y estilo parecidos a la correcta.
 - No uses «todas las anteriores» ni «ninguna de las anteriores» salvo que se pida; si se usa, pon ordenFijo = true.
 - Evita enunciados en negativo; si hace falta, escribe NO en mayúsculas.
 - En las preguntas de cálculo, resuelve el problema paso a paso antes de escribir las opciones, comprueba el resultado y construye los distractores a partir de errores frecuentes (unidades, factor olvidado, estequiometría mal ajustada). Si las opciones son números, ordénalas de menor a mayor y pon ordenFijo = true.
@@ -51,7 +51,7 @@ Reglas de las preguntas:
 - «explicacion»: una o dos frases que justifiquen la respuesta correcta (con el cálculo resumido si lo hay).
 - Nivel básico: recordar y reconocer. Medio: aplicar y relacionar. Avanzado: razonar, calcular en varios pasos o integrar conceptos.
 
-Antes de terminar, repasa cada pregunta: comprueba que la letra de «correcta» señala de verdad la opción correcta y que ningún distractor también es correcto.`;
+Antes de terminar, repasa cada pregunta: comprueba que las letras de «correctas» señalan de verdad las opciones verdaderas y que ningún distractor también es verdadero.`;
 
 function mismaClave(a, b) {
   const x = Buffer.from(String(a || '')), y = Buffer.from(String(b || ''));
@@ -78,12 +78,14 @@ export default async function handler(req, res) {
   if (apuntes.trim().length < 200) return res.status(400).json({ error: 'Faltan los apuntes.' });
   const n = Math.min(60, Math.max(1, parseInt(b.n, 10) || 20));
   const nopt = Math.min(6, Math.max(2, parseInt(b.nopt, 10) || 4));
+  const nver = Math.min(nopt - 1, Math.max(1, parseInt(b.nver, 10) || 1));
   const nivel = ['básico', 'medio', 'avanzado'].includes(b.nivel) ? `todas de nivel ${b.nivel}`
     : 'nivel mixto: aproximadamente un 30 % básico, un 50 % medio y un 20 % avanzado';
 
   const peticion = [
     `Materia: ${b.materia || 'Ciencias'}. Curso: ${b.curso || 'secundaria'}.${b.tema ? ` Tema: ${b.tema}.` : ''}`,
     `Redacta exactamente ${n} preguntas tipo test con exactamente ${nopt} opciones cada una (letras ${LET.slice(0, nopt).split('').join(', ')}), ${nivel}.`,
+    nver > 1 ? `Cada pregunta tiene exactamente ${nver} opciones verdaderas (y ${nopt - nver} falsas); el enunciado lo indica.` : 'Cada pregunta tiene exactamente una opción verdadera.',
     b.indicaciones ? `Indicaciones de la profesora (tienen prioridad): ${String(b.indicaciones).slice(0, 3000)}` : '',
   ].filter(Boolean).join('\n');
 
@@ -108,8 +110,9 @@ export default async function handler(req, res) {
     const avisos = [];
     const preguntas = (datos.preguntas || []).map((q, i) => {
       const opciones = (q.opciones || []).map(o => String(o).trim()).filter(Boolean);
-      let correcta = String(q.correcta || '').toUpperCase();
-      if (LET.indexOf(correcta) < 0 || LET.indexOf(correcta) >= opciones.length) { correcta = ''; avisos.push(`la ${i + 1} sin respuesta válida`); }
+      const correcta = [...new Set((q.correctas || []).map(x => String(x).toUpperCase()))].filter(L => LET.indexOf(L) >= 0 && LET.indexOf(L) < opciones.length).sort().join('');
+      if (!correcta) avisos.push(`la ${i + 1} sin respuesta válida`);
+      else if (correcta.length !== nver) avisos.push(`la ${i + 1} tiene ${correcta.length} verdaderas`);
       if (opciones.length !== nopt) avisos.push(`la ${i + 1} tiene ${opciones.length} opciones`);
       return { pregunta: String(q.pregunta || '').trim(), opciones, correcta, nivel: q.nivel || '', apartado: q.apartado || '', explicacion: q.explicacion || '', ordenFijo: !!q.ordenFijo, origen: 'nueva' };
     });
