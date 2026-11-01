@@ -5,23 +5,25 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Corrector de Test</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600;700&display=swap">
-<meta name="theme-color" content="#2563EB">
+<meta name="theme-color" content="#1E293B">
+<link rel="stylesheet" href="https://mariancr-marca.vercel.app/mariancr.css">
 <link rel="stylesheet" href="css/estilos.css">
+<script src="js/marca.js"></script>
 </head>
-<body>
-<div class="app">
-  <header class="top">
-    <div class="brand"><a class="marca" href="./"><img class="logo-claro" src="logo.svg" alt="mariancr"><span class="marca-nombre">Corrector de test</span></a></div>
-    <div class="proj">
-      <a class="btn sm ghost" href="crear.html">Crear examen</a>
-      <button id="btn-save" class="btn sm ghost">Guardar proyecto</button>
-      <label class="btn sm ghost" for="f-proj">Abrir proyecto</label><input id="f-proj" type="file" accept=".json,application/json" hidden>
-      <button id="btn-new" class="btn sm ghost">Nuevo examen</button>
-    </div>
-  </header>
+<body class="mcr mcr-app curso-general">
+<header class="mcr-barra">
+  <a class="mcr-barra__marca" href="./"><img src="logo-negativo.svg" alt="mariancr"><span class="mcr-barra__nombre">Corrector de test</span></a>
+  <div class="mcr-barra__usuario"><a class="btn sm ghost" href="crear.html">Crear examen</a>
+    <button id="btn-save" class="btn sm ghost">Guardar proyecto</button>
+    <label class="btn sm ghost" for="f-proj">Abrir proyecto</label><input id="f-proj" type="file" accept=".json,application/json" hidden>
+    <button id="btn-new" class="btn sm ghost">Nuevo examen</button></div>
+</header>
+<section class="mcr-trama-banda"><div class="mcr-contenedor mcr-hero">
+  <p class="hero-etq">Exámenes tipo test</p>
+  <h1>Corregir examen</h1>
+  <p class="hero-lead">Alumnos, clave, hojas de respuestas con QR, escaneo y notas para iDoceo. Todo se queda en este dispositivo.</p>
+</div></section>
+<div class="app mcr-contenedor">
   <nav class="steps" id="steps" aria-label="Pasos"></nav>
 
   <main>
@@ -51,7 +53,7 @@
     <div class="card">
       <div class="grid">
         <label class="f">Título del examen<input id="ex-title" type="text" placeholder="9 - Hidrosfera"></label>
-        <label class="f">Asignatura y grupo<input id="ex-group" type="text" placeholder="ByG - 1ESO B"></label>
+        <label class="f">Asignatura y grupo<input id="ex-group" data-curso type="text" placeholder="ByG - 1ESO B"></label>
         <label class="f">Fecha<input id="ex-date" type="date"></label>
         <label class="f">Número de preguntas<input id="ex-nq" type="number" min="1" max="2000" inputmode="numeric"></label>
         <label class="f">Opciones por pregunta
@@ -147,6 +149,7 @@
   </section>
   </main>
 </div>
+<footer class="mcr-pie-app">mariancr · Exámenes tipo test</footer>
 
 <div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-label="Revisar hoja"><div class="mpanel" id="mpanel"></div></div>
 <div id="dlg" class="dlg" hidden role="alertdialog" aria-modal="true"><div class="box"><p id="dlg-text"></p><div class="row" style="justify-content:flex-end"><button id="dlg-no" class="btn ghost">Cancelar</button><button id="dlg-ok" class="btn primary">Aceptar</button></div></div></div>
@@ -1022,7 +1025,7 @@ $('#f-roster').addEventListener('change', guard(async e => {
 /* ---------- 2. examen y clave ---------- */
 function fillExamFields() {
   const E = S.exam;
-  $('#ex-title').value = E.title; $('#ex-group').value = E.group; $('#ex-date').value = E.date; $('#ex-nq').value = E.nq;
+  $('#ex-title').value = E.title; $('#ex-group').value = E.group; if (window.cursoMarca) cursoMarca(E.group); $('#ex-date').value = E.date; $('#ex-nq').value = E.nq;
   $('#ex-nopt').value = String(E.nopt); $('#ex-scale').value = E.scale; $('#ex-pen').value = E.penMode; $('#ex-penval').value = E.penVal;
   $('#pen-custom-wrap').hidden = E.penMode !== 'custom';
 }

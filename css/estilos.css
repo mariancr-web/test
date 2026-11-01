@@ -1,35 +1,33 @@
-/* Marca mariancr (guía v3): acento General, tinta azul pizarra, Fraunces + Source Sans 3 + Barlow.
-   Los nombres de variables se mantienen del Corrector original; los valores son los de la marca. */
-:root{
-  --bg:#F1F5F9; --surface:#FFFFFF; --ink:#1E293B; --muted:#475569; --line:#CBD5E1;
-  --accent:#2563EB; --accent-hondo:#1D4ED8; --accent-ink:#FFFFFF; --soft:#EFF6FF;
-  --lead:#1E293B; --ok:#15803D; --ok-bg:#ECFDF3; --warn:#B45309; --warn-bg:#FFFBEB; --bad:#B91C1C; --bad-bg:#FEF2F2;
-  --font:"Source Sans 3","Segoe UI",system-ui,-apple-system,sans-serif;
-  --mono:"Barlow","Segoe UI",system-ui,sans-serif;
-  --titulos:"Fraunces",Georgia,serif;
-  color-scheme:light dark;
-}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0F172A; --surface:#1E293B; --ink:#F1F5F9; --muted:#94A3B8; --line:#334155;
-  --accent:#60A5FA; --accent-hondo:#93C5FD; --accent-ink:#0F172A; --soft:#172554;
-  --lead:#F1F5F9; --ok:#4ADE80; --ok-bg:#052E16; --warn:#FBBF24; --warn-bg:#3A2A06; --bad:#F87171; --bad-bg:#450A0A}}
-:root[data-theme="dark"]{
-  --bg:#0F172A; --surface:#1E293B; --ink:#F1F5F9; --muted:#94A3B8; --line:#334155;
-  --accent:#60A5FA; --accent-hondo:#93C5FD; --accent-ink:#0F172A; --soft:#172554;
-  --lead:#F1F5F9; --ok:#4ADE80; --ok-bg:#052E16; --warn:#FBBF24; --warn-bg:#3A2A06; --bad:#F87171; --bad-bg:#450A0A}
+/* Exámenes tipo test · capa propia sobre la hoja común mariancr.css (https://mariancr-marca.vercel.app/mariancr.css).
+   Sigue guia-web-herramientas.md: cabecera tinta, franja con trama, títulos Barlow, tarjetas con filete del curso.
+   Los nombres de variables vienen del Corrector original; aquí se enlazan con los tokens de la marca. */
+body.mcr{
+  --bg:var(--papel-alto); --surface:var(--papel); --ink:var(--tinta); --muted:var(--tinta-suave); --line:var(--linea);
+  --borde:var(--borde-web,#E2E8F0);
+  --accent:var(--acento); --accent-hondo:var(--texto); --accent-ink:var(--papel); --soft:var(--suave);
+  --lead:var(--tinta); --bad:var(--error);
+  --ok-bg:#ECFDF3; --warn:#B45309; --warn-bg:#FFFBEB; --bad-bg:#FEF2F2;
+  --font:var(--font-cuerpo); --mono:var(--font-marca); --titulos:var(--font-marca);
+  font-size:16px; line-height:1.5}
+[data-theme="oscuro"] body.mcr{--ok-bg:#052E16; --warn:#FBBF24; --warn-bg:#3A2A06; --bad-bg:#450A0A}
+[data-theme="oscuro"]{color-scheme:dark}
 *{box-sizing:border-box}
-body{background:var(--bg);color:var(--ink);font:16px/1.5 var(--font);margin:0;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 56px}
-.app{max-width:980px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
-h1,h2,h3{margin:0;line-height:1.2;text-wrap:balance;font-family:var(--titulos);font-variation-settings:"SOFT" 0,"WONK" 0;color:var(--ink)}
-h2{font-size:24px;font-weight:500}
-h3{font-size:17px;font-weight:600}
+.app{display:flex;flex-direction:column;gap:16px;padding-top:28px;padding-bottom:8px}
+h1,h2,h3{margin:0;line-height:1.2;text-wrap:balance;font-family:var(--font-marca);font-weight:700;color:var(--ink)}
+h2{font-size:22px}
+h3{font-size:18px;font-weight:600}
 p{margin:0}
-.top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.brand{display:flex;align-items:center;gap:10px}
+/* cabecera y franja */
+.mcr-barra .btn{background:transparent;color:#fff;border-color:rgba(255,255,255,.35);min-height:34px}
+.mcr-barra .btn:hover{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.6)}
+.mcr-hero .hero-etq{font:600 12px/1 var(--font-marca);letter-spacing:.14em;text-transform:uppercase;color:#CBD5E1;margin-bottom:10px}
+.mcr-hero .hero-lead{color:#CBD5E1;max-width:64ch;margin-top:12px;font-size:16px}
+/* títulos de sección con la raya del curso */
+.panel>h2,.panel>.row>h2,.app>h2{display:flex;align-items:center;gap:10px}
+.panel>h2::before,.panel>.row>h2::before,.app>h2::before{content:"";width:22px;height:4px;background:var(--acento);flex:none}
+.app>h2.mcr-seccion{margin:0}
 .mark{width:26px;height:26px;border-radius:50%;border:2px solid var(--lead);display:grid;place-items:center}
 .mark::after{content:"";width:12px;height:12px;border-radius:50%;background:var(--lead)}
-.brand h1{font-size:19px;font-weight:700;letter-spacing:-.01em}
 .proj{display:flex;gap:6px;flex-wrap:wrap}
 .steps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
 .step{display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 4px;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:6px;font:inherit;cursor:pointer;min-height:64px}
@@ -140,15 +138,32 @@ a.btn{text-decoration:none}
 .brand a{color:inherit;text-decoration:none}
 [hidden]{display:none!important}
 
-/* cabecera con el logo */
-.marca{display:inline-flex;align-items:center;gap:.75rem;color:var(--ink);text-decoration:none;font-family:var(--mono);font-weight:600;font-size:.8rem;letter-spacing:.12em;text-transform:uppercase}
-.marca img{height:34px;width:auto;display:block}
-.marca-nombre{color:var(--muted);border-left:1px solid var(--line);padding-left:.75rem}
-@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .logo-claro{content:url("../logo-negativo.svg")}}
-:root[data-theme="dark"] .logo-claro{content:url("../logo-negativo.svg")}
-.etiqueta{font-family:var(--mono);font-weight:600;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--accent-hondo)}
-.btn.primary:hover{background:var(--accent-hondo);border-color:var(--accent-hondo)}
-.top{padding-bottom:12px;border-bottom:1px solid var(--line)}
-th{font-family:var(--mono)}
-.chip{font-family:var(--mono);letter-spacing:.04em}
-.step .t{font-family:var(--mono);letter-spacing:.04em}
+/* tarjetas, botones y pestañas según la guía de herramientas */
+.card{border:1px solid var(--borde);border-left:5px solid var(--acento);border-radius:0;padding:20px 22px}
+a.tarjeta-enlace{transition:transform .15s,box-shadow .15s}
+a.tarjeta-enlace:hover{transform:translateY(-2px);box-shadow:0 10px 24px -14px rgba(15,23,42,.45)}
+.btn{border-radius:6px;transition:transform .15s,box-shadow .15s,background-color .12s,border-color .12s}
+.btn.primary{background:var(--texto);border-color:var(--texto);color:var(--papel)}
+.btn.primary:hover{transform:translateY(-1px);box-shadow:0 8px 20px -8px var(--acento)}
+.btn.danger{border-color:color-mix(in srgb,var(--error) 35%,transparent)}
+:focus-visible{outline-color:var(--texto)}
+input[type=text],input[type=number],input[type=date],input[type=password],select,textarea{border-radius:6px}
+input[type=password]{font:inherit;color:var(--ink);background:var(--surface);border:1px solid var(--line);padding:9px 11px;min-height:42px;width:100%}
+.tab{border-radius:6px;border-left:4px solid var(--acento);font:600 14px var(--font-marca)}
+.tab[aria-pressed="true"]{background:var(--texto);border-color:var(--texto);color:var(--papel)}
+.step{border-color:var(--borde)}
+.step[aria-current="true"]{border-color:var(--texto);box-shadow:inset 0 -3px 0 var(--acento)}
+.step[aria-current="true"] .n{background:var(--texto);border-color:var(--texto);color:var(--papel)}
+.qb[aria-pressed="true"]{background:var(--texto);border-color:var(--texto);color:var(--papel)}
+.sc,.stat,.mpanel,.dlg .box{border-color:var(--borde);border-radius:0}
+.chip{background:var(--suave);color:var(--tinta);font-family:var(--font-marca);letter-spacing:.04em}
+th{font-family:var(--font-marca)}
+.step .t{font-family:var(--font-marca);letter-spacing:.04em}
+.etiqueta{font-family:var(--font-marca);font-weight:600;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;color:var(--texto)}
+a.btn{text-decoration:none}
+.homebar{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+[hidden]{display:none!important}
+@media (prefers-reduced-motion:reduce){.btn,a.tarjeta-enlace{transition:none}.btn.primary:hover,a.tarjeta-enlace:hover{transform:none}}
+/* la franja mantiene su aire también en móvil (mcr-contenedor anula el padding vertical) */
+.mcr-contenedor.mcr-hero{padding-top:24px;padding-bottom:30px}
+@media (max-width:600px){.mcr-contenedor.mcr-hero{padding-top:18px;padding-bottom:22px}.mcr-barra .btn{min-height:32px;padding:4px 9px}}

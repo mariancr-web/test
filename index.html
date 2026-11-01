@@ -5,35 +5,41 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Exámenes tipo test</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600;700&display=swap">
-<meta name="theme-color" content="#2563EB">
+<meta name="theme-color" content="#1E293B">
+<link rel="stylesheet" href="https://mariancr-marca.vercel.app/mariancr.css">
 <link rel="stylesheet" href="css/estilos.css">
+<script src="js/marca.js"></script>
 <style>
 .home{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
 .home a.card{text-decoration:none;color:inherit;gap:8px}
-.home a.card:hover{border-color:var(--accent)}
 .home h3{font-size:18px}
 .home ol{margin:4px 0 0;padding-left:18px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:3px}
 </style>
 </head>
-<body>
-<div class="app">
-  <header class="top"><div class="brand"><a class="marca" href="./"><img class="logo-claro" src="logo.svg" alt="mariancr"><span class="marca-nombre">Exámenes tipo test</span></a></div></header>
-  <p class="lead">Crea el test en la plantilla del colegio y corrígelo con las hojas de respuestas. Todo funciona en este dispositivo: los datos del alumnado no salen de él.</p>
+<body class="mcr mcr-app curso-general">
+<header class="mcr-barra">
+  <a class="mcr-barra__marca" href="./"><img src="logo-negativo.svg" alt="mariancr"><span class="mcr-barra__nombre">Exámenes tipo test</span></a>
+  <div class="mcr-barra__usuario"></div>
+</header>
+<section class="mcr-trama-banda"><div class="mcr-contenedor mcr-hero">
+  <h1>Crea y corrige tus tests</h1>
+  <p class="hero-lead">Crea el test en la plantilla del colegio y corrígelo con las hojas de respuestas. Todo funciona en este dispositivo: los datos del alumnado no salen de él.</p>
+</div></section>
+<main class="app mcr-contenedor">
+  <h2 class="mcr-seccion">¿Qué quieres hacer?</h2>
   <div class="home">
-    <a class="card" href="crear.html">
+    <a class="card tarjeta-enlace" href="crear.html">
       <h3>Crear examen</h3>
       <p class="hint">Desde un Excel, desde un examen hecho (Word o PDF) o generando las preguntas a partir de tus apuntes.</p>
       <ol><li>Carga o genera las preguntas</li><li>Revisa las respuestas correctas</li><li>Descarga el Word por modelo, el corregido y la clave</li></ol>
     </a>
-    <a class="card" href="corrector.html">
+    <a class="card tarjeta-enlace" href="corrector.html">
       <h3>Corregir</h3>
       <p class="hint">Hojas de respuestas con QR para cada alumno, escaneo con la cámara o en PDF, notas para iDoceo e informes.</p>
       <ol><li>Alumnos</li><li>Clave (o «Al Corrector» desde Crear examen)</li><li>Imprime, escanea y exporta las notas</li></ol>
     </a>
   </div>
-</div>
+</main>
+<footer class="mcr-pie-app">mariancr · Exámenes tipo test</footer>
 </body>
 </html>

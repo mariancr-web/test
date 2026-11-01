@@ -68,6 +68,7 @@ async function textoDe(file) {
 function pintarCfg() {
   const c = S.cfg;
   $('#c-area').value = c.area || ''; $('#c-contenido').value = c.contenido || ''; $('#c-curso').value = c.curso || '';
+  if (window.cursoMarca) cursoMarca(c.curso);
   $('#c-modelos').value = (c.modelos || []).join(', '); $('#c-nota').value = c.nota; $('#c-semilla').value = c.semilla;
   $('#c-num').value = c.numPreguntas || ''; $('#c-obs').value = c.observaciones || '';
   $('#c-bp').checked = !!c.barajarPreguntas; $('#c-bo').checked = !!c.barajarOpciones; $('#c-hoja').checked = !!c.hojaRespuestas;

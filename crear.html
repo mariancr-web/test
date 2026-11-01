@@ -5,13 +5,12 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>Generador de tests</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@500;600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Source+Sans+3:wght@400;600;700&display=swap">
-<meta name="theme-color" content="#2563EB">
+<meta name="theme-color" content="#1E293B">
+<link rel="stylesheet" href="https://mariancr-marca.vercel.app/mariancr.css">
 <link rel="stylesheet" href="css/estilos.css">
+<script src="js/marca.js"></script>
 <style>
-.qcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}
+.qcard{border:1px solid var(--borde);border-left:4px solid var(--acento);border-radius:0;padding:10px 12px;display:flex;flex-direction:column;gap:6px;background:var(--surface)}
 .qcard .qh{display:flex;gap:8px;align-items:flex-start}
 .qcard .qt{flex:1;min-width:0;font-weight:600;overflow-wrap:anywhere}
 .qcard ol{margin:0;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:4px}
@@ -31,15 +30,18 @@ fieldset{border:0;padding:0;margin:0;min-width:0}
 sub,sup{font-size:.72em;line-height:0}
 </style>
 </head>
-<body>
-<div class="app">
-  <header class="top">
-    <div class="brand"><a class="marca" href="./"><img class="logo-claro" src="logo.svg" alt="mariancr"><span class="marca-nombre">Generador de tests</span></a></div>
-    <div class="proj">
-      <a class="btn sm ghost" href="corrector.html">Corrector</a>
-      <button id="btn-nuevo" class="btn sm ghost">Empezar de nuevo</button>
-    </div>
-  </header>
+<body class="mcr mcr-app curso-general">
+<header class="mcr-barra">
+  <a class="mcr-barra__marca" href="./"><img src="logo-negativo.svg" alt="mariancr"><span class="mcr-barra__nombre">Generador de tests</span></a>
+  <div class="mcr-barra__usuario"><a class="btn sm ghost" href="corrector.html">Corrector</a>
+    <button id="btn-nuevo" class="btn sm ghost">Empezar de nuevo</button></div>
+</header>
+<section class="mcr-trama-banda"><div class="mcr-contenedor mcr-hero">
+  <p class="hero-etq">Exámenes tipo test</p>
+  <h1>Crear examen</h1>
+  <p class="hero-lead">Carga las preguntas, revisa las respuestas correctas y descarga el examen en la plantilla del colegio con su corregido y su clave.</p>
+</div></section>
+<main class="app mcr-contenedor">
 
   <!-- 1. Preguntas -->
   <section class="panel">
@@ -56,7 +58,6 @@ sub,sup{font-size:.72em;line-height:0}
         <div class="row">
           <label class="btn primary" for="f-excel">Subir Excel</label><input id="f-excel" type="file" accept=".xlsx,.xls,.csv" hidden>
           <a class="btn ghost" href="plantillas/plantilla-test.xlsx" download>Plantilla vacía</a>
-          <a class="btn ghost" href="plantillas/ejemplo-q2b-t1-carbono.xlsx" download>Ejemplo (Química 2º Bach)</a>
         </div>
       </div>
 
@@ -96,7 +97,7 @@ sub,sup{font-size:.72em;line-height:0}
       <div class="grid">
         <label class="f">Área<input id="c-area" type="text" placeholder="Química"></label>
         <label class="f">Contenido<input id="c-contenido" type="text" placeholder="1 – Química del carbono"></label>
-        <label class="f">Curso<input id="c-curso" type="text" placeholder="2ºBach B"></label>
+        <label class="f">Curso<input id="c-curso" data-curso type="text" placeholder="2ºBach B"></label>
         <label class="f">Modelos<input id="c-modelos" type="text" placeholder="A, B"></label>
         <label class="f">Nota máxima<input id="c-nota" type="number" min="1" step="any" inputmode="decimal"></label>
         <label class="f">Fallos
@@ -136,7 +137,8 @@ sub,sup{font-size:.72em;line-height:0}
       <p class="hint">«Al Corrector» abre ese modelo en el Corrector con su clave, enunciados y penalización; luego solo tienes que añadir los alumnos e imprimir las hojas de respuestas.</p>
     </div>
   </section>
-</div>
+</main>
+<footer class="mcr-pie-app">mariancr · Exámenes tipo test</footer>
 
 <div id="dlg" class="dlg" hidden role="alertdialog" aria-modal="true"><div class="box"><p id="dlg-text"></p><div class="row" style="justify-content:flex-end"><button id="dlg-no" class="btn ghost">Cancelar</button><button id="dlg-ok" class="btn primary">Aceptar</button></div></div></div>
 <div id="toast" class="toast" hidden role="status"></div>
