@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hacer test</title>
+<link rel="icon" href="favicon.svg?v=2" type="image/svg+xml">
+<link rel="icon" href="favicon.ico?v=2" sizes="32x32">
+<link rel="icon" href="icon-192.png?v=2" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
+<meta name="theme-color" content="#1E293B">
+<link rel="stylesheet" href="https://mariancr-marca.vercel.app/mariancr.css">
+<link rel="stylesheet" href="css/estilos.css">
+<script src="js/marca.js"></script>
+</head>
+<body class="mcr mcr-app curso-general">
+<header class="mcr-barra">
+  <a class="mcr-barra__marca" href="hacer.html"><img src="logo-negativo.svg" alt="mariancr"><span class="mcr-barra__nombre">Hacer test</span></a>
+  <div class="mcr-barra__usuario"><span id="quien"></span><button id="salir" class="btn sm ghost" hidden>Salir</button></div>
+</header>
+<section class="mcr-trama-banda"><div class="mcr-contenedor mcr-hero hero-corto">
+  <p class="hero-etq" id="h-etq">Test en línea</p>
+  <h1 id="h-tit">Hacer test</h1>
+  <p class="hero-lead" id="h-lead">Escribe el código que te ha dado tu profesor o profesora.</p>
+</div></section>
+<main class="app mcr-contenedor">
+
+  <section id="v-codigo" class="panel">
+    <div class="card acceso-test">
+      <label class="f">Código del test<input id="codigo" type="text" maxlength="6" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="ABC123" class="input-codigo"></label>
+      <div class="row"><button id="b-google" class="btn primary">Entrar con la cuenta del colegio</button></div>
+      <details class="sin-cuenta"><summary>No tengo cuenta del colegio</summary>
+        <div class="row"><label class="f grow">Nombre y apellidos<input id="nombre" type="text" maxlength="60" autocomplete="name"></label><button id="b-anon" class="btn">Entrar con mi nombre</button></div>
+        <p class="hint">Solo funciona si tu profesor o profesora lo ha permitido en este test.</p>
+      </details>
+      <p id="m-codigo" class="hint" role="status"></p>
+    </div>
+  </section>
+
+  <section id="v-intro" class="panel" hidden>
+    <div class="card">
+      <h2 id="i-tit"></h2>
+      <ul class="datos" id="i-datos"></ul>
+      <p class="hint">Cada respuesta se guarda al momento: si se va la conexión o se cierra el navegador, vuelve a entrar con el mismo código y sigues por donde ibas. No cambies de pestaña ni de aplicación mientras haces el test: queda registrado.</p>
+      <div class="row"><button id="b-empezar" class="btn primary">Empezar el test</button></div>
+    </div>
+  </section>
+
+  <section id="v-test" class="panel" hidden>
+    <div class="barra-test" id="barra-test"><span id="t-prog" class="chip">0 de 0</span><span id="t-reloj" class="reloj" hidden></span><span id="t-guardado" class="hint"></span><button id="b-entregar-arriba" class="btn sm primary">Entregar</button></div>
+    <ol id="preguntas" class="preguntas"></ol>
+    <div class="card"><div class="row between"><p id="t-resumen" class="hint"></p><button id="b-entregar" class="btn primary">Entregar el test</button></div></div>
+  </section>
+
+  <section id="v-fin" class="panel" hidden>
+    <div class="card fin">
+      <p class="fin__ok">✓</p>
+      <h2 id="f-tit">Test entregado</h2>
+      <p id="f-txt" class="hint"></p>
+      <div id="f-nota"></div>
+    </div>
+  </section>
+</main>
+<footer class="mcr-pie-app">mariancr · Exámenes tipo test</footer>
+
+<div id="dlg" class="dlg" hidden role="alertdialog" aria-modal="true"><div class="box"><p id="dlg-text"></p><div class="row" style="justify-content:flex-end"><button id="dlg-no" class="btn ghost">Cancelar</button><button id="dlg-ok" class="btn primary">Aceptar</button></div></div></div>
+<div id="toast" class="toast" hidden role="status"></div>
+
+<script src="js/test-core.js"></script>
+<script src="js/online-core.js"></script>
+<script type="module" src="js/hacer.js"></script>
+</body>
+</html>

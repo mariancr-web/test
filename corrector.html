@@ -16,7 +16,7 @@
 <body class="mcr mcr-app curso-general">
 <header class="mcr-barra">
   <a class="mcr-barra__marca" href="./"><img src="logo-negativo.svg" alt="mariancr"><span class="mcr-barra__nombre">Exámenes tipo test</span></a>
-  <nav class="secciones" aria-label="Secciones"><a href="crear.html">Crear examen</a><a href="corrector.html" aria-current="page">Corregir</a></nav>
+  <nav class="secciones" aria-label="Secciones"><a href="crear.html">Crear examen</a><a href="corrector.html" aria-current="page">Corregir</a><a href="online.html">Hacer test</a></nav>
 </header>
 <section class="mcr-trama-banda"><div class="mcr-contenedor mcr-hero">
   <p class="hero-etq">Exámenes tipo test</p>
@@ -1714,7 +1714,8 @@ $('#btn-new').onclick = guard(async () => {
 });
 
 /* ---------- arranque ---------- */
-rosterCount(); showStep('p1');
+rosterCount();
+{ let ir = 'p1'; try { const v = localStorage.getItem('corrector-ir-a'); if (v && STEPS.some(([p]) => p === v)) ir = v; localStorage.removeItem('corrector-ir-a'); } catch (e) { /* nada */ } showStep(ir); }
 })();
 
 </script>

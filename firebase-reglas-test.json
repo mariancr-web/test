@@ -1,0 +1,66 @@
+{
+  "tests": {
+    "$code": {
+      ".read": "auth != null && (auth.token.email_verified === true && auth.token.email.matches(/.*@nervion\\.salesianas\\.org$/) || root.child('teachers').child(auth.uid).val() === true || auth.provider === 'anonymous' && data.child('guests').val() === true)",
+      ".write": "auth != null && root.child('teachers').child(auth.uid).val() === true && (!data.exists() || data.child('owner').val() === auth.uid) && (!newData.exists() || newData.child('owner').val() === auth.uid)"
+    }
+  },
+  "testKeys": {
+    "$code": {
+      ".read": "auth != null && root.child('tests').child($code).child('owner').val() === auth.uid",
+      ".write": "auth != null && root.child('tests').child($code).child('owner').val() === auth.uid"
+    }
+  },
+  "teacherTests": {
+    "$uid": {
+      ".read": "auth != null && auth.uid === $uid",
+      ".write": "auth != null && auth.uid === $uid && root.child('teachers').child($uid).val() === true"
+    }
+  },
+  "testSubs": {
+    "$code": {
+      ".read": "auth != null && root.child('tests').child($code).child('owner').val() === auth.uid",
+      ".write": "auth != null && root.child('tests').child($code).child('owner').val() === auth.uid",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid",
+        ".write": "auth != null && auth.uid === $uid && newData.exists() && root.child('tests').child($code).child('open').val() === true && (auth.token.email_verified === true && auth.token.email.matches(/.*@nervion\\.salesianas\\.org$/) || auth.provider === 'anonymous' && root.child('tests').child($code).child('guests').val() === true) && data.child('done').val() !== true && (!data.child('startedAt').exists() || !(root.child('tests').child($code).child('minutes').val() > 0) || now <= data.child('startedAt').val() + root.child('tests').child($code).child('minutes').val() * 60000 + 90000)",
+        ".validate": "newData.hasChildren(['name', 'email', 'startedAt'])",
+        "name": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 60"
+        },
+        "email": {
+          ".validate": "newData.isString() && (auth.provider === 'anonymous' && newData.val() === '' || auth.provider !== 'anonymous' && newData.val() === auth.token.email.toLowerCase())"
+        },
+        "startedAt": {
+          ".validate": "!data.exists() && newData.val() === now || data.val() === newData.val()"
+        },
+        "away": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "done": {
+          ".validate": "newData.isBoolean()"
+        },
+        "doneAt": {
+          ".validate": "newData.val() === now"
+        },
+        "answers": {
+          "$q": {
+            ".validate": "newData.isString() && newData.val().length <= 8"
+          }
+        },
+        "$otro": {
+          ".validate": false
+        }
+      }
+    }
+  },
+  "testResults": {
+    "$code": {
+      ".read": "auth != null && root.child('tests').child($code).child('owner').val() === auth.uid",
+      ".write": "auth != null && root.child('tests').child($code).child('owner').val() === auth.uid",
+      "$uid": {
+        ".read": "auth != null && auth.uid === $uid && root.child('tests').child($code).child('showResult').val() === true"
+      }
+    }
+  }
+}

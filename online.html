@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Hacer test</title>
+<link rel="icon" href="favicon.svg?v=2" type="image/svg+xml">
+<link rel="icon" href="favicon.ico?v=2" sizes="32x32">
+<link rel="icon" href="icon-192.png?v=2" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
+<meta name="theme-color" content="#1E293B">
+<link rel="stylesheet" href="https://mariancr-marca.vercel.app/mariancr.css">
+<link rel="stylesheet" href="css/estilos.css">
+<script src="js/marca.js"></script>
+</head>
+<body class="mcr mcr-app curso-general">
+<header class="mcr-barra">
+  <a class="mcr-barra__marca" href="./"><img src="logo-negativo.svg" alt="mariancr"><span class="mcr-barra__nombre">Exámenes tipo test</span></a>
+  <nav class="secciones" aria-label="Secciones"><a href="crear.html">Crear examen</a><a href="corrector.html">Corregir</a><a href="online.html" aria-current="page">Hacer test</a></nav>
+</header>
+<section class="mcr-trama-banda"><div class="mcr-contenedor mcr-hero">
+  <p class="hero-etq">Exámenes tipo test</p>
+  <h1>Hacer test</h1>
+  <p class="hero-lead">El alumnado hace el test en el móvil o el ordenador con un código. Cada alumno recibe su propio orden de preguntas y opciones, y las respuestas pasan al Corrector para sacar las notas e informes.</p>
+</div></section>
+<main class="app mcr-contenedor">
+  <div class="herramientas" role="toolbar" aria-label="Cuenta" id="cuenta" hidden>
+    <span class="herramientas__tit" id="cuenta-nombre">Docente</span>
+    <a class="btn sm ghost" href="hacer.html" target="_blank" rel="noopener">Página del alumnado</a>
+    <button id="t-salir" class="btn sm ghost">Salir</button>
+  </div>
+
+  <section id="acceso" class="panel">
+    <h2>Entrar</h2>
+    <div class="card">
+      <p>Entra con la cuenta de Google con la que usas Clase en directo.</p>
+      <div class="row"><button id="t-entrar" class="btn primary">Entrar con Google</button><span id="acceso-msg" class="hint"></span></div>
+    </div>
+  </section>
+
+  <section id="nuevo" class="panel" hidden>
+    <h2>Publicar un test</h2>
+    <div class="card">
+      <div class="origenes">
+        <button class="origen" id="o-crear" aria-pressed="false"><b>El examen de «Crear examen»</b><span class="hint" id="o-crear-info">No tienes ningún examen en Crear examen.</span></button>
+        <label class="origen" for="n-excel" id="o-excel" aria-pressed="false"><b>Subir un Excel de preguntas</b><span class="hint" id="o-excel-info">La misma plantilla de Crear examen (hojas «Examen» y «Preguntas»).</span></label><input id="n-excel" type="file" accept=".xlsx,.xls,.csv" hidden>
+      </div>
+      <div id="n-datos" hidden>
+        <div><h3 id="n-tit"></h3><p class="hint" id="n-info"></p></div>
+        <div class="grid" style="margin-top:12px">
+          <label class="f">Título que verá el alumnado<input id="n-titulo" type="text" maxlength="120"></label>
+          <label class="f">Tiempo (minutos, 0 = sin límite)<input id="n-min" type="number" min="0" max="600" value="0" inputmode="numeric"></label>
+        </div>
+        <div class="row" style="gap:18px;margin-top:12px">
+          <label class="check"><input id="n-bp" type="checkbox" checked> Cada alumno con su orden de preguntas</label>
+          <label class="check"><input id="n-bo" type="checkbox" checked> Barajar también las opciones</label>
+          <label class="check"><input id="n-inv" type="checkbox"> Permitir entrar sin cuenta del colegio (con nombre)</label>
+        </div>
+        <div class="row" style="margin-top:12px"><button id="n-pub" class="btn primary">Publicar y dar el código</button><span id="n-msg" class="hint"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="lista" class="panel" hidden>
+    <h2>Mis tests en línea</h2>
+        <div id="tests" class="tests"></div>
+  </section>
+</main>
+<footer class="mcr-pie-app">mariancr · Exámenes tipo test</footer>
+
+<div id="proy" class="proy" hidden role="dialog" aria-modal="true" aria-label="Código del test">
+  <div class="proy__caja">
+    <p class="proy__tit" id="proy-tit"></p>
+    <div class="proy__fila"><div id="proy-qr" class="proy__qr"></div>
+      <div><p class="hint">Entra en</p><p class="proy__url" id="proy-url"></p><p class="hint">y escribe el código</p><p class="codigo-grande" id="proy-cod"></p></div></div>
+    <div class="row" style="justify-content:center"><button id="proy-copiar" class="btn">Copiar enlace</button><button id="proy-cerrar" class="btn primary">Cerrar</button></div>
+  </div>
+</div>
+<div id="dlg" class="dlg" hidden role="alertdialog" aria-modal="true"><div class="box"><p id="dlg-text"></p><div class="row" style="justify-content:flex-end"><button id="dlg-no" class="btn ghost">Cancelar</button><button id="dlg-ok" class="btn primary">Aceptar</button></div></div></div>
+<div id="toast" class="toast" hidden role="status"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="js/test-core.js"></script>
+<script src="js/online-core.js"></script>
+<script type="module" src="js/online.js"></script>
+</body>
+</html>
