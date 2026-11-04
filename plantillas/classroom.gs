@@ -1,5 +1,5 @@
 /**
- * Volcar a Google Classroom las notas y los informes del Corrector de test (mariancr-test.vercel.app).
+ * Volcar a Google Classroom las notas y los informes del Corrector de test (test.mariancr.es).
  *
  * Va pegado en una hoja de cálculo de Google (Extensiones → Apps Script) y necesita
  * el servicio avanzado «Google Classroom API» (Servicios → +). Ver «LEEME Classroom.md».
